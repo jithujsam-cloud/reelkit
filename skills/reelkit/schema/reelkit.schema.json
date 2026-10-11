@@ -1,0 +1,260 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/jithujsam-cloud/reelkit/schema/reelkit.schema.json",
+  "title": "reelkit config",
+  "description": "Declarative scenes for verified screenshots, framed mockups and demo videos.",
+  "type": "object",
+  "required": ["baseUrl", "scenes"],
+  "additionalProperties": false,
+  "definitions": {
+    "selectorList": { "type": "array", "items": { "type": "string" } },
+    "viewport": {
+      "oneOf": [
+        { "type": "string", "enum": ["mobile", "tablet", "desktop", "wide"], "description": "Preset: mobile 390x844, tablet 820x1180, desktop 1440x900, wide 1920x1080." },
+        {
+          "type": "object",
+          "required": ["name", "width", "height"],
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+            "width": { "type": "integer", "minimum": 200, "maximum": 3840 },
+            "height": { "type": "integer", "minimum": 200, "maximum": 3840 },
+            "deviceScaleFactor": { "type": "number", "minimum": 1, "maximum": 3 },
+            "mobile": { "type": "boolean", "description": "Emulate a touch phone (meta viewport, touch events)." },
+            "device": { "type": "string", "enum": ["phone", "tablet", "laptop", "browser", "none"], "description": "Frame used for this viewport." }
+          }
+        }
+      ]
+    },
+    "waitFor": {
+      "description": "Extra readiness condition: a selector string, or {selector} / {text}.",
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "selector": { "type": "string" },
+            "text": { "type": "string" },
+            "timeout": { "type": "integer", "minimum": 0 }
+          }
+        }
+      ]
+    },
+    "selectorOrTarget": { "type": "string", "description": "Playwright selector: CSS, text=…, role=button[name=\"Save\"], etc." },
+    "action": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "description": "One step. Exactly one key per list item.",
+      "properties": {
+        "click": { "oneOf": [{ "$ref": "#/definitions/selectorOrTarget" }, { "type": "object", "required": ["selector"], "properties": { "selector": { "type": "string" }, "zoom": { "type": ["boolean", "number"] } }, "additionalProperties": false }] },
+        "hover": { "$ref": "#/definitions/selectorOrTarget" },
+        "type": {
+          "type": "object",
+          "required": ["into", "text"],
+          "additionalProperties": false,
+          "properties": {
+            "into": { "type": "string" },
+            "text": { "type": "string", "description": "May reference ${ENV_VAR}; expanded values are redacted from logs." },
+            "clear": { "type": "boolean" },
+            "zoom": { "type": ["boolean", "number"] }
+          }
+        },
+        "press": { "oneOf": [{ "type": "string" }, { "type": "object", "required": ["key"], "properties": { "key": { "type": "string" }, "into": { "type": "string" } }, "additionalProperties": false }] },
+        "scroll": {
+          "oneOf": [
+            { "type": "integer", "description": "Scroll by N CSS pixels." },
+            { "type": "string", "description": "Selector to scroll into view, or 'top' / 'bottom'." },
+            { "type": "object", "properties": { "to": { "type": "string" }, "by": { "type": "integer" } }, "additionalProperties": false }
+          ]
+        },
+        "wait": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0, "description": "Milliseconds." },
+            { "type": "object", "properties": { "for": { "type": "string" }, "text": { "type": "string" }, "hidden": { "type": "string" } }, "additionalProperties": false }
+          ]
+        },
+        "select": { "type": "object", "required": ["from", "value"], "additionalProperties": false, "properties": { "from": { "type": "string" }, "value": { "type": "string" } } },
+        "drag": { "type": "object", "required": ["from", "to"], "additionalProperties": false, "properties": { "from": { "type": "string" }, "to": { "type": "string" } } },
+        "goto": { "type": "string" },
+        "waitFor": { "$ref": "#/definitions/waitFor" }
+      },
+      "additionalProperties": false
+    },
+    "output": { "type": "string", "enum": ["still", "fullpage", "gif", "mp4", "framed"] },
+    "theme": { "type": "string", "enum": ["light", "dark", "both"] }
+  },
+  "properties": {
+    "$schema": { "type": "string" },
+    "name": { "type": "string", "description": "Product name, used in captions and the social preview." },
+    "tagline": { "type": "string", "description": "One-line pitch for the social preview." },
+    "baseUrl": { "type": "string", "description": "Deployed URL, e.g. https://app.example.com. May reference ${ENV_VAR}." },
+    "output": { "type": "string", "default": "docs/media", "description": "Where assets and manifest.json are written." },
+    "concurrency": { "type": "integer", "minimum": 1, "maximum": 8, "default": 3 },
+    "headers": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Extra HTTP headers on every request (e.g. Vercel protection bypass). Values may reference ${ENV_VAR}." },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Applied to every scene unless the scene overrides it.",
+      "properties": {
+        "viewports": { "type": "array", "items": { "$ref": "#/definitions/viewport" }, "minItems": 1 },
+        "theme": { "$ref": "#/definitions/theme" },
+        "deviceScaleFactor": { "type": "number", "minimum": 1, "maximum": 3, "default": 2 },
+        "outputs": { "type": "array", "items": { "$ref": "#/definitions/output" } },
+        "hide": { "$ref": "#/definitions/selectorList" },
+        "mask": { "$ref": "#/definitions/selectorList" },
+        "waitFor": { "$ref": "#/definitions/waitFor" }
+      }
+    },
+    "determinism": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "time": { "type": ["string", "boolean"], "default": "2026-01-15T09:30:00Z", "description": "Freeze the page clock to this ISO date (false to disable)." },
+        "locale": { "type": "string", "default": "en-US" },
+        "timezone": { "type": "string", "default": "UTC" },
+        "hideBuiltins": { "type": "boolean", "default": true, "description": "Hide common cookie banners, chat widgets, toasts and dev overlays." },
+        "seed": { "type": "integer", "default": 7, "description": "Seed for human-like typing jitter." }
+      }
+    },
+    "stability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeout": { "type": "integer", "minimum": 1000, "default": 15000, "description": "Per-attempt budget in ms." },
+        "retries": { "type": "integer", "minimum": 1, "maximum": 6, "default": 3 },
+        "networkQuietMs": { "type": "integer", "minimum": 0, "default": 500 },
+        "diffThreshold": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.0005, "description": "Max fraction of pixels allowed to differ between consecutive frames." },
+        "diffInterval": { "type": "integer", "minimum": 100, "default": 400 },
+        "consecutiveMatches": { "type": "integer", "minimum": 1, "default": 2 },
+        "busySelectors": { "$ref": "#/definitions/selectorList", "description": "Extra skeleton/spinner selectors that must be gone." },
+        "allowInfinite": { "$ref": "#/definitions/selectorList", "description": "Elements whose infinite animations are tolerated (e.g. an ambient background)." },
+        "ignoreRequests": { "$ref": "#/definitions/selectorList", "description": "URL substrings ignored by the network-quiet check (analytics, long-polling)." },
+        "scrollLazy": { "type": "boolean", "default": true }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "type": "string", "enum": ["manual", "form", "token", "none"], "default": "manual" },
+        "loginUrl": { "type": "string", "description": "Where the login page lives (also used to detect expired sessions)." },
+        "checkUrl": { "type": "string", "description": "A protected page used to verify the saved session." },
+        "loggedInSelector": { "type": "string", "description": "Visible only when signed in (optional, strengthens checks)." },
+        "loggedOutSelector": { "type": "string", "default": "input[type=password]" },
+        "storageState": { "type": "string", "default": ".reelkit/auth.json" },
+        "form": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "email": { "type": "string", "default": "input[type=email], input[name=email], input[name=username]" },
+            "password": { "type": "string", "default": "input[type=password]" },
+            "submit": { "type": "string", "default": "button[type=submit]" },
+            "emailEnv": { "type": "string", "default": "REELKIT_EMAIL" },
+            "passwordEnv": { "type": "string", "default": "REELKIT_PASSWORD" }
+          }
+        },
+        "token": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "url": { "type": "string", "description": "Visit this URL to obtain a session, e.g. /api/test-login?token=${PREVIEW_TOKEN}." },
+            "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+            "cookies": { "type": "array", "items": { "type": "object", "required": ["name", "value"], "properties": { "name": { "type": "string" }, "value": { "type": "string" }, "domain": { "type": "string" }, "path": { "type": "string" } } } }
+          }
+        }
+      }
+    },
+    "motion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fps": { "type": "integer", "minimum": 10, "maximum": 60, "default": 30 },
+        "cursor": { "type": "boolean", "default": true },
+        "zoom": { "type": ["boolean", "number"], "default": false, "description": "Zoom toward clicks (true = 1.5x, or a factor)." },
+        "maxHold": { "type": "number", "minimum": 0.1, "default": 0.7, "description": "Seconds any frozen stretch may last (dead-time trim)." },
+        "startHold": { "type": "number", "minimum": 0, "default": 0.8 },
+        "endHold": { "type": "number", "minimum": 0, "default": 1.6 },
+        "loop": { "type": "boolean", "default": true, "description": "Crossfade the end into the first frame for a seamless loop." },
+        "typingDelay": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2, "default": [45, 120] },
+        "cursorSpeed": { "type": "number", "minimum": 0.2, "maximum": 4, "default": 1 },
+        "keepBackdropBlur": { "type": "boolean", "default": false, "description": "Keep CSS backdrop-filter during recordings (costly in headless Chromium; off by default)." }
+      }
+    },
+    "gif": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "width": { "type": "integer", "minimum": 320, "maximum": 1600, "default": 960 },
+        "fps": { "type": "integer", "minimum": 6, "maximum": 30, "default": 15 },
+        "quality": { "type": "integer", "minimum": 30, "maximum": 100, "default": 90 },
+        "encoder": { "type": "string", "enum": ["auto", "gifski", "ffmpeg"], "default": "auto", "description": "auto = gifski (sharpest) unless the clip zooms, where ffmpeg's palette encoder avoids ghost trails." },
+        "maxBytes": { "type": "integer", "minimum": 100000, "default": 5000000 }
+      }
+    },
+    "frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "background": { "type": "string", "default": "aurora", "description": "Preset (aurora, sunset, ocean, mesh, slate, paper, transparent), a hex color, or any CSS background." },
+        "backgroundDark": { "type": "string", "default": "midnight" },
+        "accent": { "type": "string", "default": "#7c5cff" },
+        "padding": { "type": "integer", "minimum": 0, "default": 72 },
+        "radius": { "type": "integer", "minimum": 0, "default": 12 },
+        "shadow": { "type": "boolean", "default": true },
+        "url": { "type": "string", "description": "Text in the browser frame's address bar ('none' hides it; default: the page's host and path)." }
+      }
+    },
+    "marketing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hero": { "type": "string", "description": "Scene used for the README hero (a motion scene gives a GIF hero)." },
+        "trio": { "type": "string", "description": "Scene shot at mobile+tablet+desktop for the responsive trio." },
+        "social": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "scene": { "type": "string" },
+            "title": { "type": "string" },
+            "subtitle": { "type": "string" }
+          }
+        }
+      }
+    },
+    "readme": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "file": { "type": "string", "default": "README.md" },
+        "gallery": { "type": "array", "items": { "type": "string" }, "description": "Scenes to show in the screenshot gallery (default: all stills)." }
+      }
+    },
+    "scenes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "url"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "description": "Slug used in file names." },
+          "title": { "type": "string", "description": "Human caption (README alt text, frame title)." },
+          "url": { "type": "string", "description": "Route relative to baseUrl, or an absolute URL." },
+          "viewports": { "type": "array", "items": { "$ref": "#/definitions/viewport" }, "minItems": 1 },
+          "theme": { "$ref": "#/definitions/theme" },
+          "auth": { "type": "boolean", "default": false },
+          "waitFor": { "$ref": "#/definitions/waitFor" },
+          "hide": { "$ref": "#/definitions/selectorList" },
+          "mask": { "$ref": "#/definitions/selectorList", "description": "Blurred in every output (PII)." },
+          "actions": { "type": "array", "items": { "$ref": "#/definitions/action" } },
+          "scrollTo": { "type": ["string", "integer"], "description": "Selector or y offset to frame a still." },
+          "outputs": { "type": "array", "items": { "$ref": "#/definitions/output" }, "minItems": 1 },
+          "zoom": { "type": ["boolean", "number"] },
+          "stability": { "type": "object", "description": "Per-scene overrides of the stability block." }
+        }
+      }
+    }
+  }
+}

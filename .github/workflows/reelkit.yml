@@ -1,0 +1,102 @@
+name: reelkit
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Unit + stability tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: skills/reelkit/package-lock.json
+      - run: npm ci
+        working-directory: skills/reelkit
+      - run: npx playwright install --with-deps chromium
+        working-directory: skills/reelkit
+      - run: npm test
+        working-directory: skills/reelkit
+      - name: Config schema validates the example
+        run: node skills/reelkit/scripts/reelkit.mjs verify --config-only --config skills/reelkit/reelkit.config.example.yaml
+
+  dogfood:
+    name: reelkit all on the demo app
+    runs-on: ubuntu-latest
+    needs: test
+    env:
+      # Public demo credentials for examples/demo-app (not a real account).
+      REELKIT_EMAIL: demo@reelkit.dev
+      REELKIT_PASSWORD: reelkit-demo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            skills/reelkit/package-lock.json
+            examples/demo-app/package-lock.json
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install reelkit
+        working-directory: skills/reelkit
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Build and start the demo app
+        run: |
+          npm run demo:install
+          npm run demo:build
+          (npm run demo:start > demo.log 2>&1 &)
+          npm run demo:wait
+      - name: Validate plugin manifests
+        # Informational: the validator ships inside the Claude Code CLI.
+        continue-on-error: true
+        run: npx -y @anthropic-ai/claude-code plugin validate . --strict
+      - name: reelkit all (fails if any asset FAILS automated verification)
+        run: node skills/reelkit/scripts/reelkit.mjs all --ci --no-readme
+      - name: Break stability on purpose and expect a refusal
+        run: |
+          cat > /tmp/chaos.yaml <<'YAML'
+          baseUrl: http://localhost:3000
+          output: /tmp/chaos-out
+          stability: { timeout: 6000, retries: 2 }
+          auth: { mode: form, loginUrl: /login, checkUrl: /dashboard, storageState: /tmp/chaos-auth.json, form: { email: "#email", password: "#password" } }
+          defaults: { viewports: [desktop], theme: light, outputs: [still] }
+          scenes:
+            - { name: slow, url: "/dashboard?chaos=1", auth: true }
+            - { name: forever, url: "/dashboard?chaos=forever", auth: true }
+          YAML
+          set +e
+          node skills/reelkit/scripts/reelkit.mjs shoot --config /tmp/chaos.yaml
+          code=$?
+          set -e
+          test "$code" = "2" || { echo "expected exit 2 (one FAILED asset), got $code"; exit 1; }
+          test -f /tmp/chaos-out/slow-desktop-light.png || { echo "slow page should have been captured after waiting"; exit 1; }
+          test ! -f /tmp/chaos-out/forever-desktop-light.png || { echo "never-stable page must not produce a file"; exit 1; }
+          echo "Stability engine waited for the slow page and refused the broken one."
+      - name: Upload media + QA report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reelkit-media
+          path: |
+            docs/media
+            .reelkit/qa-report.json
+            .reelkit/contact-sheet.png
+            demo.log
+          retention-days: 14

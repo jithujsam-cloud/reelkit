@@ -1,0 +1,27 @@
+{
+  "name": "reelkit",
+  "version": "0.1.0",
+  "description": "Turn any deployed web app into a README-ready media kit: verified screenshots, framed mockups and smooth demo GIFs/MP4s.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "bin": {
+    "reelkit": "scripts/reelkit.mjs"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "pixelmatch": "^7.1.0",
+    "playwright": "^1.56.1",
+    "pngjs": "^7.0.0",
+    "yaml": "^2.8.1"
+  },
+  "optionalDependencies": {
+    "gifski": "^1.7.1"
+  }
+}

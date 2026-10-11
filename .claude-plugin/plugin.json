@@ -1,0 +1,11 @@
+{
+  "name": "reelkit",
+  "displayName": "reelkit",
+  "version": "0.1.0",
+  "description": "Turn any deployed web app into a README-ready media kit: verified screenshots, device-framed mockups and smooth demo GIF/MP4s, including pages behind login.",
+  "author": { "name": "Jithu Jobin Sam", "url": "https://github.com/jithujsam-cloud" },
+  "homepage": "https://github.com/jithujsam-cloud/reelkit",
+  "repository": "https://github.com/jithujsam-cloud/reelkit",
+  "license": "MIT",
+  "keywords": ["screenshots", "readme", "gif", "demo", "mockup", "playwright", "marketing", "social-preview"]
+}

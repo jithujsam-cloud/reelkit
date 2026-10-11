@@ -1,0 +1,67 @@
+# Dogfooding config: generates every image and GIF in this repo's README from examples/demo-app.
+# yaml-language-server: $schema=./skills/reelkit/schema/reelkit.schema.json
+
+name: Pulse
+tagline: Outbound analytics that books meetings
+baseUrl: ${DEMO_URL:-http://localhost:3000}
+output: docs/media
+
+defaults:
+  viewports: [desktop]
+  theme: both
+  outputs: [still, framed]
+  mask: [".user-email"]           # PII stays blurred in every output
+
+auth:
+  mode: form                       # CI-friendly; locally you could use `manual`
+  loginUrl: /login
+  checkUrl: /dashboard
+  form: { email: "#email", password: "#password", submit: "button[type=submit]" }
+
+scenes:
+  - name: landing
+    title: Landing page
+    url: /
+    viewports: [desktop, mobile]
+    waitFor: { text: "books meetings" }
+
+  - name: dashboard
+    title: Analytics dashboard
+    url: /dashboard
+    auth: true
+    viewports: [desktop, tablet, mobile]
+    waitFor: { text: "Recent activity" }
+
+  - name: campaigns
+    title: Campaigns
+    url: /campaigns
+    auth: true
+    waitFor: "table"
+
+  - name: new-campaign
+    title: Creating a campaign
+    url: /campaigns
+    auth: true
+    theme: light
+    waitFor: "table"
+    zoom: 1.35
+    outputs: [mp4, gif, framed]
+    actions:
+      - click: "text=New campaign"
+      - type: { into: "#campaign-name", text: "Q4 Outbound" }
+      - select: { from: "#channel", value: "LinkedIn" }
+      - click: { selector: "text=Create campaign", zoom: false }   # the result appears elsewhere: stay wide
+      - wait: { text: "Q4 Outbound" }
+
+gif:
+  width: 880                     # matches the README display width
+
+frame:
+  background: aurora
+  backgroundDark: midnight
+  url: app.pulse.example
+
+marketing:
+  hero: new-campaign            # a motion scene: the README hero is the framed GIF
+  trio: dashboard
+  social: { scene: dashboard, title: "Pulse", subtitle: "Outbound analytics that books meetings" }

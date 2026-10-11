@@ -1,0 +1,177 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<!-- reelkit frame template. Generic device shapes drawn in CSS; no trademarked artwork. -->
+<style>
+  :root { --accent: #7c5cff; --radius: 12px; --text: #fff; --sub: rgba(255,255,255,.78); }
+  html, body { margin: 0; background: transparent; }
+  body { font: 16px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  #canvas { position: relative; display: inline-flex; flex-direction: column; align-items: center; overflow: hidden; }
+  #canvas.fixed { display: block; }
+  .heading { text-align: center; color: var(--text); margin-bottom: 36px; max-width: 80%; }
+  .heading h1 { margin: 0; font-size: 44px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
+  .heading p { margin: 10px 0 0; font-size: 20px; color: var(--sub); }
+
+  .device { position: relative; flex: none; }
+  .screen { position: relative; overflow: hidden; background: #000; }
+  .viewport { position: relative; overflow: hidden; }
+  .screen img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+  .statusbar { height: 50px; box-sizing: border-box; padding: 0 30px 0 38px; display: flex; align-items: center; justify-content: space-between; font: 600 16px/1 ui-sans-serif, system-ui, -apple-system, sans-serif; letter-spacing: -0.01em; }
+  .statusbar .icons { display: flex; gap: 6px; align-items: center; }
+
+  /* Browser window */
+  .browser { border-radius: var(--radius); overflow: hidden; }
+  .browser .chrome { height: 44px; display: flex; align-items: center; gap: 14px; padding: 0 16px; box-sizing: border-box; }
+  .browser.light .chrome { background: #ececf0; border-bottom: 1px solid #d9d9e0; }
+  .browser.dark .chrome { background: #22232b; border-bottom: 1px solid #31323c; }
+  .dots { display: flex; gap: 8px; }
+  .dots i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+  .dots i:nth-child(1) { background: #ff5f57; } .dots i:nth-child(2) { background: #febc2e; } .dots i:nth-child(3) { background: #28c840; }
+  .url { flex: 1; max-width: 520px; margin: 0 auto; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; transform: translateX(-30px); }
+  .browser.light .url { background: #fff; color: #55565f; }
+  .browser.dark .url { background: #15161c; color: #a2a4b2; }
+  .url svg { opacity: .7; }
+  .browser .screen { border-radius: 0 0 var(--radius) var(--radius); }
+
+  /* Phone: generic rounded slab with a camera pill */
+  .phone { padding: 13px; border-radius: 64px; background: linear-gradient(145deg, #2c2d33, #0d0e12); box-shadow: inset 0 0 0 2px #45464e, inset 0 0 0 5px #0b0b0e; }
+  .phone .screen { border-radius: 51px; }
+  .phone .viewport { border-radius: 0 0 51px 51px; }
+  .tablet .viewport { border-radius: 24px; }
+  .browser .viewport, .plain .viewport { border-radius: 0 0 var(--radius) var(--radius); }
+  .phone .btn { position: absolute; width: 4px; border-radius: 2px; background: #2a2b31; }
+  .phone .pill { position: absolute; top: 24px; left: 50%; transform: translateX(-50%); width: 118px; height: 34px; border-radius: 20px; background: #050506; z-index: 2; }
+  /* Tablet */
+  .tablet { padding: 22px; border-radius: 44px; background: linear-gradient(145deg, #2c2d33, #0d0e12); box-shadow: inset 0 0 0 2px #45464e; }
+  .tablet .screen { border-radius: 24px; }
+  .tablet .cam { position: absolute; top: 9px; left: 50%; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; background: #1d1e24; box-shadow: inset 0 0 0 1px #34353d; z-index: 2; }
+  /* Laptop */
+  .laptop .lid { padding: 18px 18px 26px; border-radius: 22px 22px 6px 6px; background: linear-gradient(180deg, #2a2b31, #111216); box-shadow: inset 0 0 0 2px #3c3d45; }
+  .laptop .screen { border-radius: 6px; }
+  .laptop .cam { position: absolute; top: 7px; left: 50%; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: #3a3b44; z-index: 2; }
+  .laptop .base { position: relative; height: 22px; margin: 0 -7%; border-radius: 2px 2px 16px 16px; background: linear-gradient(180deg, #d9dbe2, #a9acb6 70%, #8d909a); }
+  .laptop .base::before { content: ""; position: absolute; left: 50%; top: 0; width: 16%; height: 9px; margin-left: -8%; border-radius: 0 0 10px 10px; background: #b9bcc6; }
+  .plain { border-radius: var(--radius); overflow: hidden; }
+  .plain .screen { border-radius: var(--radius); }
+
+  .shadow.browser, .shadow.plain { box-shadow: 0 2px 6px rgba(0,0,0,.12), 0 30px 80px -10px rgba(10,10,30,.45); }
+  .shadow.phone, .shadow.tablet { filter: drop-shadow(0 30px 50px rgba(10,10,30,.45)); }
+  .shadow.laptop { filter: drop-shadow(0 30px 60px rgba(10,10,30,.45)); }
+
+  /* Render modes used to composite videos into frames */
+  body.mode-mask #canvas { background: #000 !important; }
+  body.mode-mask .heading, body.mode-mask .device > :not(.screen):not(.lid), body.mode-mask .lid > :not(.screen) { visibility: hidden; }
+  body.mode-mask .device, body.mode-mask .lid, body.mode-mask .chrome { background: transparent !important; box-shadow: none !important; filter: none !important; }
+  body.mode-mask .chrome { visibility: hidden; }
+  body.mode-mask .screen { background: #000 !important; }
+  body.mode-mask .statusbar { visibility: hidden; }
+  body.mode-mask .viewport { background: #fff !important; }
+  body.mode-mask .screen img { visibility: hidden; }
+  body.mode-overlay #canvas { background: transparent !important; }
+  body.mode-overlay * { visibility: hidden; }
+  body.mode-overlay .pill, body.mode-overlay .cam { visibility: visible; }
+  body.mode-hole .viewport { background: #000 !important; }
+  body.mode-hole .screen img { visibility: hidden; }
+
+  /* Social card */
+  .social { width: 1280px; height: 640px; }
+  .social .copy { position: absolute; left: 72px; top: 0; bottom: 0; width: 470px; display: flex; flex-direction: column; justify-content: center; color: var(--text); z-index: 2; }
+  .social .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; opacity: .9; margin-bottom: 22px; }
+  .social .brand i { width: 12px; height: 12px; border-radius: 4px; background: var(--accent); box-shadow: 0 0 0 3px rgba(255,255,255,.25); }
+  .social h1 { margin: 0; font-size: 60px; line-height: 1.02; letter-spacing: -0.035em; font-weight: 800; }
+  .social p { margin: 18px 0 0; font-size: 24px; line-height: 1.35; color: var(--sub); }
+  .social .stage { position: absolute; left: 600px; top: 70px; transform-origin: 0 0; }
+</style>
+</head>
+<body>
+<div id="canvas"></div>
+<script>
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const lock = '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M17 9V7a5 5 0 0 0-10 0v2H5v13h14V9h-2zm-8 0V7a3 3 0 0 1 6 0v2H9z"/></svg>';
+
+  function device(d, opts) {
+    const shadow = opts.shadow ? ' shadow' : '';
+    // Phones get a status bar (safe area) so the camera pill never covers app content.
+    const bar = d.type === 'phone' ? 50 : 0;
+    const status = bar
+      ? `<div class="statusbar" style="background:${d.bar?.bg ?? '#fff'};color:${d.bar?.fg ?? '#111'}"><span>9:41</span><span class="icons">
+          <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><path d="M8 2.2c2.4 0 4.6.9 6.2 2.5l1.3-1.4A10.6 10.6 0 0 0 8 .3 10.6 10.6 0 0 0 .5 3.3l1.3 1.4A8.7 8.7 0 0 1 8 2.2zm0 3.7c1.4 0 2.7.5 3.6 1.4L13 5.9A7 7 0 0 0 8 4a7 7 0 0 0-5 1.9l1.4 1.4c.9-.9 2.2-1.4 3.6-1.4zM8 9.4 9.9 7.6a2.7 2.7 0 0 0-3.8 0z"/></svg>
+          <svg width="27" height="13" viewBox="0 0 27 13" fill="none"><rect x=".5" y=".5" width="23" height="12" rx="3.5" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="18" height="9" rx="2" fill="currentColor"/><rect x="25" y="4.5" width="1.5" height="4" rx=".7" fill="currentColor" opacity=".4"/></svg>
+        </span></div>`
+      : '';
+    const screen = `<div class="screen" style="width:${d.w}px;height:${d.h}px">${status}<div class="viewport" style="height:${d.h - bar}px">${d.src ? `<img src="${d.src}">` : ''}</div></div>`;
+    if (d.type === 'browser') {
+      return `<div class="device browser ${d.chrome}${shadow}"><div class="chrome"><div class="dots"><i></i><i></i><i></i></div>
+        <div class="url">${d.url ? lock + esc(d.url) : ''}</div></div>${screen}</div>`;
+    }
+    if (d.type === 'phone') {
+      return `<div class="device phone${shadow}"><span class="btn" style="left:-3px;top:150px;height:34px"></span><span class="btn" style="left:-3px;top:210px;height:62px"></span>
+        <span class="btn" style="left:-3px;top:284px;height:62px"></span><span class="btn" style="right:-3px;top:230px;height:96px"></span><div class="pill"></div>${screen}</div>`;
+    }
+    if (d.type === 'tablet') return `<div class="device tablet${shadow}"><div class="cam"></div>${screen}</div>`;
+    if (d.type === 'laptop') return `<div class="device laptop${shadow}"><div class="lid"><div class="cam"></div>${screen}</div><div class="base"></div></div>`;
+    return `<div class="device plain${shadow}">${screen}</div>`;
+  }
+
+  window.render = async (o) => {
+    document.body.className = `mode-${o.mode || 'full'}`;
+    const root = document.documentElement.style;
+    root.setProperty('--accent', o.accent);
+    root.setProperty('--radius', `${o.radius}px`);
+    root.setProperty('--text', o.darkBg ? '#fff' : '#14151c');
+    root.setProperty('--sub', o.darkBg ? 'rgba(255,255,255,.8)' : 'rgba(20,21,28,.65)');
+    const c = document.getElementById('canvas');
+    c.style.background = o.background;
+    const heading = o.title || o.caption ? `<div class="heading">${o.title ? `<h1>${esc(o.title)}</h1>` : ''}${o.caption ? `<p>${esc(o.caption)}</p>` : ''}</div>` : '';
+
+    if (o.layout === 'single') {
+      c.className = '';
+      c.style.padding = `${o.padding}px`;
+      c.innerHTML = heading + device(o.devices[0], o);
+    } else if (o.layout === 'trio') {
+      // Back: desktop device; front-left: tablet; front-right: phone.
+      c.className = 'fixed';
+      c.style.width = `${o.width}px`;
+      c.style.height = `${o.height}px`;
+      const [big, tab, ph] = o.devices;
+      c.innerHTML = `${heading ? `<div style="position:absolute;left:0;right:0;top:${o.padding * 0.7}px;display:flex;justify-content:center">${heading}</div>` : ''}
+        <div class="slot" id="s0">${device(big, o)}</div><div class="slot" id="s1">${device(tab, o)}</div><div class="slot" id="s2">${device(ph, o)}</div>`;
+      // Shrink-wrap each device, scale it to a share of the canvas width, align bottoms,
+      // then centre the whole group vertically.
+      const slots = ['s0', 's1', 's2'].map((id) => document.getElementById(id));
+      for (const el of slots) el.style.cssText = 'position:absolute;left:0;top:0;transform-origin:0 0';
+      const layout = [
+        { w: 0.6, cx: 0.53, lift: 0.05 },
+        { w: 0.27, cx: 0.2, lift: 0 },
+        { w: 0.13, cx: 0.85, lift: -0.01 },
+      ];
+      const boxes = slots.map((el, i) => {
+        const r = el.getBoundingClientRect();
+        const s = (o.width * layout[i].w) / r.width;
+        return { el, s, w: r.width * s, h: r.height * s, cx: o.width * layout[i].cx, lift: o.height * layout[i].lift };
+      });
+      const groupH = Math.max(...boxes.map((b) => b.h + b.lift));
+      const top = heading ? 150 : 0;
+      const bottom = top + (o.height - top + groupH) / 2;
+      for (const b of boxes) {
+        b.el.style.transform = `translate(${b.cx - b.w / 2}px, ${bottom - b.lift - b.h}px) scale(${b.s})`;
+      }
+    } else if (o.layout === 'social') {
+      c.className = 'fixed social';
+      c.innerHTML = `<div class="copy">${o.brand && o.brand !== o.title ? `<div class="brand"><i></i>${esc(o.brand)}</div>` : ''}<h1>${esc(o.title)}</h1>${o.caption ? `<p>${esc(o.caption)}</p>` : ''}</div>
+        <div class="stage" id="stage">${device(o.devices[0], o)}</div>`;
+      const st = document.getElementById('stage');
+      const r = st.firstElementChild.getBoundingClientRect();
+      st.style.transform = `scale(${860 / r.width})`;
+    }
+    await Promise.all([...document.images].map((i) => (i.complete ? null : new Promise((res) => { i.onload = i.onerror = res; }))));
+    await document.fonts.ready;
+    const sc = document.querySelector('.viewport').getBoundingClientRect();
+    const cv = c.getBoundingClientRect();
+    return { canvas: { w: cv.width, h: cv.height }, screen: { x: sc.x - cv.x, y: sc.y - cv.y, w: sc.width, h: sc.height } };
+  };
+</script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+# yaml-language-server: $schema=./schema/reelkit.schema.json
+# Annotated example. Copy to your project root as reelkit.config.yaml (or run `reelkit init`).
+
+name: Acme                      # product name: hero title and social card
+tagline: The calm way to ship   # subtitle for hero/social
+baseUrl: https://app.acme.dev   # deployed URL; may use ${ENV_VAR}
+output: docs/media              # where images, videos and manifest.json go
+
+defaults:                       # applied to every scene
+  viewports: [desktop, mobile]  # mobile 390x844 · tablet 820x1180 · desktop 1440x900 · wide 1920x1080
+  theme: both                   # light | dark | both
+  outputs: [still, framed]      # still | fullpage | gif | mp4 | framed
+  mask: [".user-email", "[data-pii]"]   # blurred everywhere
+
+determinism:
+  time: "2026-01-15T09:30:00Z"  # frozen clock so dates never change between runs
+  locale: en-US
+  timezone: UTC
+
+stability:                      # see reference/stability.md
+  timeout: 15000
+  ignoreRequests: ["/api/poll", "plausible.io"]
+
+auth:                           # see reference/auth.md
+  mode: manual                  # manual | form | token | none
+  loginUrl: /login
+  checkUrl: /dashboard
+
+headers:                        # e.g. Vercel deployment protection
+  x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET:-}
+
+scenes:
+  - name: home
+    url: /
+    waitFor: { text: "Start free" }
+
+  - name: dashboard
+    url: /dashboard
+    auth: true
+    viewports: [desktop, tablet, mobile]
+    waitFor: { selector: "[data-testid=revenue-chart] svg" }
+
+  - name: create-project        # a recorded flow
+    url: /projects
+    auth: true
+    viewports: [desktop]
+    theme: light
+    zoom: 1.4
+    outputs: [mp4, gif, framed]
+    actions:
+      - click: "text=New project"
+      - type: { into: "#project-name", text: "Launch plan" }
+      - select: { from: "#template", value: "Roadmap" }
+      - click: "role=button[name='Create']"
+      - wait: { text: "Launch plan" }
+
+motion: { cursor: true, loop: true }
+gif: { width: 960, fps: 15, maxBytes: 5000000 }
+
+frame:
+  background: aurora
+  backgroundDark: midnight
+  url: app.acme.dev
+
+marketing:
+  hero: create-project
+  trio: dashboard
+  social: { scene: dashboard }
