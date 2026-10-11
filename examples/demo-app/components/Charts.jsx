@@ -34,7 +34,7 @@ export function LineChart({ data }) {
         <line key={g} x1="0" x2={w} y1={h * g} y2={h * g} className="grid" />
       ))}
       <path d={area} fill="url(#area)" className="area" />
-      <path d={d} className="line" pathLength="1" />
+      <path d={d} className="line" />
     </svg>
   );
 }

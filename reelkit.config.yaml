@@ -1,0 +1,39 @@
+# Dogfooding config: generates every image and GIF in this repo's README from examples/demo-app.
+# yaml-language-server: $schema=./skills/reelkit/schema/reelkit.schema.json
+
+name: Pulse
+tagline: Outbound analytics that books meetings
+baseUrl: ${DEMO_URL:-http://localhost:3000}
+output: docs/media
+
+defaults:
+  viewports: [desktop]
+  theme: both
+  outputs: [still, framed]
+
+auth:
+  mode: form                       # CI-friendly; locally you could use `manual`
+  loginUrl: /login
+  checkUrl: /dashboard
+  form: { email: "#email", password: "#password", submit: "button[type=submit]" }
+
+scenes:
+  - name: landing
+    title: Landing page
+    url: /
+    viewports: [desktop, mobile]
+    waitFor: { text: "books meetings" }
+
+  - name: dashboard
+    title: Analytics dashboard
+    url: /dashboard
+    auth: true
+    viewports: [desktop, tablet, mobile]
+    waitFor: { text: "Recent activity" }
+    mask: [".user-email"]            # PII stays blurred in every output
+
+  - name: campaigns
+    title: Campaigns
+    url: /campaigns
+    auth: true
+    waitFor: "table"

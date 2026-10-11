@@ -131,9 +131,10 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px r
 
 .line-chart { width: 100%; height: 200px; display: block; }
 .line-chart .grid { stroke: var(--border); stroke-dasharray: 4 4; }
-.line-chart .line { fill: none; stroke: var(--accent); stroke-width: 3; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 1.2s 0.3s ease forwards; }
+.line-chart { clip-path: inset(0 100% 0 0); animation: reveal 1.2s 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.line-chart .line { fill: none; stroke: var(--accent); stroke-width: 3; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
 .line-chart .area { opacity: 0; animation: fade 0.8s 0.9s ease forwards; }
-@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes reveal { to { clip-path: inset(0 0 0 0); } }
 @keyframes fade { to { opacity: 1; } }
 .bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 180px; }
 .bar-col { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
