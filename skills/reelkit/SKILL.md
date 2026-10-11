@@ -132,3 +132,6 @@ See [reference/troubleshooting.md](reference/troubleshooting.md). Common cases: 
 (shorten the flow, lower `gif.width`/`gif.fps`, or embed the MP4), and `waitFor never became visible`.
 Motion details (cursor, zoom, dead-time trim, loops) live in [reference/motion.md](reference/motion.md);
 frames, backgrounds and marketing images in [reference/framing.md](reference/framing.md).
+Optional: `reelkit design inspect` describes the site's real design system (palette, type, shape,
+layout, assets) with evidence and confidence, without changing any capture; see
+[reference/design.md](reference/design.md).

@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Design intelligence Phase 1: `reelkit design inspect` writes `design-profile.json` + `.md` describing
+  the site's rendered design system (palette roles for light/dark, typography, radius/shadow/border,
+  spacing, layout, responsive behaviour, logo/icons/theme-color) with source, basis
+  (observed/declared/inferred/unknown) and confidence for every finding; documentation that
+  contradicts the rendered site is recorded as a conflict; gaps are listed, never filled with defaults.
+  Read-only: no capture, rendering or default changes. See `skills/reelkit/reference/design.md`.
+- Design profile schema (`schema/design-profile.schema.json`) and tests: fixture sites (brand, dark,
+  conflicting docs, monochrome, plain, class-toggled dark, unreachable, auth), reconciliation units,
+  schema validation.
 - Design intelligence Phase 0 (measurement only, no styling changes); see `docs/design/phase0-baseline.md`.
 - Screen-region authenticity check: framed stills record their screen geometry, and `verify` adds an
   `authentic` check proving the framed screen is a pixel-exact copy of the raw capture (rounded clips

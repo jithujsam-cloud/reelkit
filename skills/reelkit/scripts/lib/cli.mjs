@@ -20,6 +20,8 @@ Commands
                          --mark <file>=pass|fail [--note "..."]  record a visual verdict
                          --strict  also require a visual PASS for every asset
   readme               Print the README block (--write inserts it between markers)
+  design inspect       Describe the site's real design system: design-profile.md + .json
+                         (--source <dir> app source to scan, --no-source, --out <dir>)
   all                  preflight → auth check → shoot → record → frame → verify (→ readme if markers exist)
 
 Options
@@ -40,7 +42,7 @@ function parseArgs(argv) {
     else if (a.startsWith('--')) {
       const [k, inline] = a.slice(2).split('=', 2);
       const key = k.replace(/-([a-z])/g, (_, ch) => ch.toUpperCase());
-      const flags = ['ci', 'json', 'force', 'check', 'strict', 'write', 'headed', 'sample', 'configOnly', 'noReadme'];
+      const flags = ['ci', 'json', 'force', 'check', 'strict', 'write', 'headed', 'sample', 'configOnly', 'noReadme', 'noSource'];
       if (flags.includes(key)) args[key] = inline === undefined ? true : inline !== 'false';
       else {
         const v = inline ?? argv[++i];
@@ -136,6 +138,22 @@ const commands = {
     const { verify } = await import('./verify.mjs');
     const res = await verify(cfg, { marks: args.mark, note: args.note, strict: args.strict, ci: args.ci, json: args.json });
     if (!res.ok) throw new ReelkitError(res.message, res.fix, { code: 2 });
+  },
+
+  async design(args) {
+    const sub = args._[1];
+    if (sub !== 'inspect') {
+      throw new ReelkitError(sub ? `Unknown design subcommand "${sub}".` : 'design needs a subcommand.', `Use \`${NAME} design inspect\` (more design steps arrive in later versions).`);
+    }
+    const cfg = loadConfig(args.config);
+    const { inspectDesign } = await import('./design/inspect.mjs');
+    const outDir = args.out ? path.resolve(args.out) : undefined;
+    const sourceRoot = args.noSource ? false : path.resolve(args.source ?? cfg.root);
+    const res = await withBrowser((browser) => inspectDesign(cfg, { browser, only: args.only, outDir, sourceRoot }));
+    if (args.json) console.log(JSON.stringify(res.profile, null, 2));
+    if (res.profile.coverage.status === 'not rendered') {
+      throw new ReelkitError('No page of the site could be rendered, so nothing was observed.', 'Check baseUrl and network access, run `reelkit auth` for protected routes, then re-run `reelkit design inspect`.', { code: 2 });
+    }
   },
 
   async readme(args) {

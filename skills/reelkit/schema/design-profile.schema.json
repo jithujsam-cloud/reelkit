@@ -1,0 +1,146 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/jithujsam-cloud/reelkit/schema/design-profile.schema.json",
+  "title": "reelkit design profile",
+  "description": "What a website's design system looks like as rendered, with provenance and confidence for every finding. Produced by `reelkit design inspect`.",
+  "type": "object",
+  "required": ["profileVersion", "generator", "site", "coverage", "summary", "palette", "typography", "shape", "spacing", "layout", "responsive", "style", "assets", "designSystems", "observedColors", "conflicts", "unverified"],
+  "properties": {
+    "profileVersion": { "const": 1 },
+    "generator": { "type": "string" },
+    "site": {
+      "type": "object",
+      "required": ["baseUrl"],
+      "properties": { "baseUrl": { "type": "string" }, "name": { "type": ["string", "null"] } }
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["status", "routes", "themes", "viewports", "sourceRoot", "sourceFiles", "docs"],
+      "properties": {
+        "status": { "enum": ["complete", "partial", "not rendered"] },
+        "routes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["url", "status", "themes", "viewports"],
+            "properties": {
+              "url": { "type": "string" },
+              "status": { "enum": ["ok", "partial", "unreachable", "auth required", "auth expired", "not measured"] },
+              "reason": { "type": "string" },
+              "themes": { "type": "array", "items": { "enum": ["light", "dark"] } },
+              "viewports": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "themes": { "type": "object" },
+        "viewports": { "type": "array", "items": { "type": "string" } },
+        "sourceRoot": { "type": ["string", "null"] },
+        "sourceFiles": { "type": "array", "items": { "type": "string" } },
+        "docs": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "summary": { "$ref": "#/definitions/statement" },
+    "palette": {
+      "type": "object",
+      "required": ["light", "dark"],
+      "properties": {
+        "light": { "oneOf": [{ "$ref": "#/definitions/palette" }, { "type": "null" }] },
+        "dark": { "oneOf": [{ "$ref": "#/definitions/palette" }, { "type": "null" }] }
+      }
+    },
+    "typography": {
+      "type": "object",
+      "required": ["heading", "body", "mono", "scale", "webFonts"],
+      "properties": {
+        "heading": { "$ref": "#/definitions/finding" },
+        "body": { "$ref": "#/definitions/finding" },
+        "mono": { "$ref": "#/definitions/finding" },
+        "scale": { "type": "object" },
+        "webFonts": { "type": "array", "items": { "type": "object", "required": ["family", "weights"] } }
+      }
+    },
+    "shape": { "type": "object" },
+    "spacing": { "type": ["object", "null"] },
+    "layout": { "type": "object" },
+    "responsive": { "type": "array" },
+    "style": { "type": "object", "required": ["mode"] },
+    "assets": { "type": "object", "required": ["logos", "icons", "themeColor", "manifest", "ogImage"] },
+    "designSystems": { "type": "array", "items": { "$ref": "#/definitions/finding" } },
+    "observedColors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["hex", "theme", "share", "chromatic"],
+        "properties": { "hex": { "$ref": "#/definitions/hex" }, "share": { "type": "number", "minimum": 0, "maximum": 1 } }
+      }
+    },
+    "conflicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["field", "declared", "declaredIn", "sourceType", "resolution"],
+        "properties": {
+          "field": { "type": "string" },
+          "observed": { "type": ["string", "null"] },
+          "declared": { "type": "string" },
+          "declaredIn": { "type": "string" },
+          "sourceType": { "enum": ["docs", "source-css", "source-tokens"] },
+          "deltaE": { "type": "number", "minimum": 0 },
+          "resolution": { "type": "string" }
+        }
+      }
+    },
+    "unverified": { "type": "array", "items": { "type": "string" } }
+  },
+  "definitions": {
+    "hex": { "type": "string", "pattern": "^#[0-9a-f]{6}$" },
+    "basis": { "enum": ["observed", "declared", "inferred", "unknown"] },
+    "source": {
+      "type": "object",
+      "required": ["type", "detail"],
+      "properties": {
+        "type": { "enum": ["rendered-role", "rendered-var", "logo", "meta", "pixel", "source-css", "source-tokens", "docs"] },
+        "detail": { "type": "string" },
+        "route": { "type": "string" },
+        "theme": { "enum": ["light", "dark"] }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "required": ["value", "basis", "confidence", "level", "sources"],
+      "properties": {
+        "basis": { "$ref": "#/definitions/basis" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "level": { "enum": ["high", "medium", "low"] },
+        "sources": { "type": "array", "items": { "$ref": "#/definitions/source" } },
+        "reason": { "type": "string" }
+      },
+      "if": { "properties": { "value": { "type": "null" } } },
+      "then": { "required": ["reason"], "properties": { "basis": { "const": "unknown" }, "confidence": { "const": 0 } } },
+      "else": { "properties": { "basis": { "enum": ["observed", "declared", "inferred"] } } }
+    },
+    "colorFinding": {
+      "allOf": [
+        { "$ref": "#/definitions/finding" },
+        { "properties": { "value": { "oneOf": [{ "$ref": "#/definitions/hex" }, { "type": "null" }] } } }
+      ]
+    },
+    "statement": {
+      "type": "object",
+      "required": ["value", "basis"],
+      "properties": { "basis": { "$ref": "#/definitions/basis" } }
+    },
+    "palette": {
+      "type": "object",
+      "required": ["roles", "accents"],
+      "properties": {
+        "roles": {
+          "type": "object",
+          "required": ["background", "surface", "text", "textMuted", "border", "primary"],
+          "additionalProperties": { "$ref": "#/definitions/colorFinding" }
+        },
+        "accents": { "type": "array", "items": { "$ref": "#/definitions/colorFinding" } }
+      }
+    }
+  }
+}
