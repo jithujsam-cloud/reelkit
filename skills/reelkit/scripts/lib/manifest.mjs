@@ -33,6 +33,10 @@ export function writeManifest(cfg) {
         qa: visual?.verdict ?? 'pending',
       };
     });
-  writeJson(path.join(cfg.outDir, 'manifest.json'), { generator: `${NAME} ${VERSION}`, generatedAt: new Date().toISOString(), assets });
+  // Idempotent: an unchanged asset list keeps its timestamp, so no-op re-runs leave git clean.
+  const file = path.join(cfg.outDir, 'manifest.json');
+  const prev = readJson(file, null);
+  const same = prev && JSON.stringify(prev.assets) === JSON.stringify(assets) && prev.generator === `${NAME} ${VERSION}`;
+  if (!same) writeJson(file, { generator: `${NAME} ${VERSION}`, generatedAt: new Date().toISOString(), assets });
   return assets;
 }
