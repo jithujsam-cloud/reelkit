@@ -8,6 +8,7 @@ import { loadResults } from './state.mjs';
 import { inspectPng } from './imagecheck.mjs';
 import { qaFile, writeManifest } from './manifest.mjs';
 import { tools } from './deps.mjs';
+import { compareScreenRegion } from './authenticity.mjs';
 
 const RUBRIC = [
   'fully loaded: real data, no skeletons, spinners or placeholder blocks',
@@ -65,6 +66,15 @@ async function automatedChecks(cfg, file, result) {
     const img = inspectPng(abs);
     add('not-blank', !img.problems.length, img.problems[0]);
     add('dimensions', img.width >= 200 && img.height >= 200, `${img.width}×${img.height}`);
+    // Framed stills record where the screen sits; prove it still holds the untouched capture.
+    if (result.screen && result.from) {
+      const source = path.join(cfg.outDir, result.from);
+      if (!existsSync(source)) add('authentic', false, `source ${result.from} missing`);
+      else {
+        const cmp = compareScreenRegion({ framed: abs, raw: source, rect: result.screen.rect, src: result.screen.src, clips: result.screen.clips });
+        add('authentic', cmp.ok, cmp.ok ? cmp.summary : cmp.reason);
+      }
+    }
   } else if (tools().ffmpeg) {
     const { probe, decodes } = await import('./media.mjs');
     const p = probe(abs);
