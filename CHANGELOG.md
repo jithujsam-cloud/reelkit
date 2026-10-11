@@ -27,6 +27,16 @@ All notable changes to this project are documented here. The format follows
 - Tests: `tests/design-profile.test.mjs` (schema, missing values, confidence, conflicts, guard, fixture sites).
 - `discover.mjs` now exports `walk` (no behaviour change).
 
+### Changed (design profile stabilisation)
+- Dark themes switched by a class/attribute or theme toggle are reported `unverified` (confidence 0.35)
+  instead of "no dark theme"; `responds` keeps its meaning and `status`/`toggle` are added.
+- Source scanning: `@fontsource` dependencies, `next/font/google` imports and shadcn `components.json`.
+  Role-less font claims only corroborate. `next/font` aliases (`__Inter_5e0a8e`) are normalised to the family.
+- Profile and markdown are byte-stable across runs: `generator.generatedAt` moved out of the canonical
+  profile into `design-profile.run.json` (optional in the schema, so older profiles still validate).
+- Pages behind login (401/403 or a redirect to login/SSO) are skipped and reported; other HTTP errors fail
+  the inspection instead of profiling the error page.
+
 ### Fixed
 - Design profile accuracy (follow-up to Phase 1): neutrals are compared with a tighter tolerance
   (ΔEok 0.01 instead of 0.03), so a white card on a `#f9fafb` page is a distinct surface; logo SVG colour
