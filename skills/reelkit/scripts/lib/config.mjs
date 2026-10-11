@@ -66,10 +66,11 @@ export function findConfig(explicit, cwd = process.cwd()) {
   return file;
 }
 
-let ajv;
+// Compile once: the schema has an $id, so compiling it twice on one Ajv instance throws.
+let compiled;
 function validator() {
-  if (!ajv) ajv = new Ajv({ allErrors: true, strict: false, useDefaults: false });
-  return ajv.compile(JSON.parse(readFileSync(SCHEMA_PATH, 'utf8')));
+  compiled ??= new Ajv({ allErrors: true, strict: false, useDefaults: false }).compile(JSON.parse(readFileSync(SCHEMA_PATH, 'utf8')));
+  return compiled;
 }
 
 export function validateConfig(raw, file = CONFIG_FILE) {

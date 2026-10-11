@@ -3,6 +3,21 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Design intelligence Phase 0 (measurement only, no styling changes); see `docs/design/phase0-baseline.md`.
+- Screen-region authenticity check: framed stills record their screen geometry, and `verify` adds an
+  `authentic` check proving the framed screen is a pixel-exact copy of the raw capture (rounded clips
+  masked; scaled placements refused). Older results without geometry skip it.
+- Small colour utilities (`scripts/lib/color.mjs`): WCAG contrast, OKLab/OKLCH, ΔEok.
+- Renderer regression baseline (`tests/frame.test.mjs`, `tests/fixtures/frame-baseline.json`):
+  exact geometry and screen pixels for every device frame, background probes, locked frame defaults.
+- Tests: colour utilities, authenticity (synthetic, committed assets, end-to-end verify), config.
+
+### Fixed
+- `loadConfig()` no longer throws when called twice in one process (schema compiled once).
+
 ## [0.1.0] - 2026-10-11
 
 ### Added

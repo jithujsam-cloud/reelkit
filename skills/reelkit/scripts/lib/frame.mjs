@@ -12,6 +12,7 @@ import { stillName } from './shoot.mjs';
 import { encodeOutputs, masterPath, motionBase } from './record.mjs';
 import { tools } from './deps.mjs';
 import { extractFrame, ffmpeg, probe } from './media.mjs';
+import { screenGeometry } from './authenticity.mjs';
 
 const BACKGROUNDS = JSON.parse(readFileSync(path.join(TEMPLATES_DIR, 'backgrounds.json'), 'utf8'));
 const TEMPLATE = pathToFileURL(path.join(TEMPLATES_DIR, 'frame.html')).href;
@@ -72,7 +73,7 @@ function topBar(file) {
   }
 }
 
-function spec(cfg, shot, src, { barFrom } = {}) {
+export function spec(cfg, shot, src, { barFrom } = {}) {
   const type = deviceType(shot.viewport);
   return {
     type,
@@ -86,7 +87,7 @@ function spec(cfg, shot, src, { barFrom } = {}) {
 }
 
 /** Render the template once and screenshot the canvas. Returns canvas + screen rects in CSS px. */
-async function render(browser, opts, { dsf, out, mode = 'full', screenOnly = false }) {
+export async function render(browser, opts, { dsf, out, mode = 'full', screenOnly = false }) {
   const page = await browser.newPage({ viewport: { width: 4200, height: 3200 }, deviceScaleFactor: dsf });
   try {
     await page.goto(TEMPLATE);
@@ -104,7 +105,7 @@ async function render(browser, opts, { dsf, out, mode = 'full', screenOnly = fal
   }
 }
 
-function baseOpts(cfg, theme, extra = {}) {
+export function baseOpts(cfg, theme, extra = {}) {
   const bg = background(cfg, theme, { opaque: extra.opaque });
   return {
     layout: 'single',
@@ -147,8 +148,10 @@ async function frameStills(cfg, scenes, browser) {
         log.fail(`${rel(cfg.root, out)}: skipped, source ${src} is missing or FAILED`);
         continue;
       }
-      await render(browser, baseOpts(cfg, shot.theme, { devices: [spec(cfg, shot, path.join(cfg.outDir, src))] }), { dsf: shot.viewport.deviceScaleFactor, out });
-      if (!record(cfg, out, meta)) failed++;
+      const dsf = shot.viewport.deviceScaleFactor;
+      const rects = await render(browser, baseOpts(cfg, shot.theme, { devices: [spec(cfg, shot, path.join(cfg.outDir, src))] }), { dsf, out });
+      // Metadata only: lets `verify` prove the screen region is the untouched capture.
+      if (!record(cfg, out, { ...meta, screen: screenGeometry(rects, dsf) })) failed++;
     }
   }
   return failed;
@@ -244,8 +247,11 @@ async function marketing(cfg, allScenes, browser) {
       const src = desktopOf(heroScene.name, theme);
       if (!src) continue;
       const out = path.join(cfg.outDir, `hero-${theme}.png`);
-      await render(browser, baseOpts(cfg, theme, { padding: Math.round(cfg.frame.padding * 1.25), title: cfg.name, caption: tagline, devices: [spec(cfg, src.shot, src.file)] }), { dsf: 2, out });
-      if (!record(cfg, out, { scene: heroScene.name, theme, kind: 'hero' })) failed++;
+      const rects = await render(browser, baseOpts(cfg, theme, { padding: Math.round(cfg.frame.padding * 1.25), title: cfg.name, caption: tagline, devices: [spec(cfg, src.shot, src.file)] }), { dsf: 2, out });
+      // The hero renders at 2x; the screen is 1:1 with the capture only when the capture is 2x too.
+      const oneToOne = src.shot.viewport.deviceScaleFactor === 2;
+      const extra = oneToOne ? { from: path.basename(src.file), screen: screenGeometry(rects, 2) } : {};
+      if (!record(cfg, out, { scene: heroScene.name, theme, kind: 'hero', ...extra })) failed++;
     }
   }
 

@@ -170,7 +170,19 @@
     await document.fonts.ready;
     const sc = document.querySelector('.viewport').getBoundingClientRect();
     const cv = c.getBoundingClientRect();
-    return { canvas: { w: cv.width, h: cv.height }, screen: { x: sc.x - cv.x, y: sc.y - cv.y, w: sc.width, h: sc.height } };
+    // Rounded clips over the screen area (CSS px, relative to the screen rect): the viewport's own
+    // corners and its clipping parent's (on phones the parent's arc reaches into the viewport below the
+    // status bar). Used to mask corners when checking that the framed screen still matches the raw
+    // capture. Read-only: does not affect rendering.
+    const keys = ['borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius'];
+    const clipOf = (el) => {
+      const r = el.getBoundingClientRect();
+      const st = getComputedStyle(el);
+      return { x: r.x - sc.x, y: r.y - sc.y, w: r.width, h: r.height, radii: keys.map((k) => parseFloat(st[k]) || 0) };
+    };
+    const vpEl = document.querySelector('.viewport');
+    const clips = [clipOf(vpEl), clipOf(vpEl.parentElement)];
+    return { canvas: { w: cv.width, h: cv.height }, screen: { x: sc.x - cv.x, y: sc.y - cv.y, w: sc.width, h: sc.height, clips } };
   };
 </script>
 </body>
