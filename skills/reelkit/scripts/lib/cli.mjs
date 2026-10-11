@@ -20,6 +20,8 @@ Commands
                          --mark <file>=pass|fail [--note "..."]  record a visual verdict
                          --strict  also require a visual PASS for every asset
   readme               Print the README block (--write inserts it between markers)
+  design               Inspect a site's real design system → .reelkit/design/design-profile.{json,md}
+                         --url <url> (default: baseUrl of the config)  --pages /a,/b  --root <dir with design docs>
   all                  preflight → auth check → shoot → record → frame → verify (→ readme if markers exist)
 
 Options
@@ -142,6 +144,27 @@ const commands = {
     const cfg = loadConfig(args.config);
     const { readme } = await import('./readme.mjs');
     await readme(cfg, { write: args.write, file: args.file });
+  },
+
+  async design(args) {
+    let url = args.url;
+    if (!url) {
+      // Only baseUrl is taken from the config; frame/accent settings are deliberately never read here.
+      try {
+        url = loadConfig(args.config).baseUrl;
+      } catch (err) {
+        throw new ReelkitError('No URL to inspect.', `Pass --url https://your.site (or run in a folder with a valid ${CONFIG_FILE}).`);
+      }
+    }
+    if (!/^https?:\/\//.test(url)) throw new ReelkitError(`--url must start with http(s):// (got "${url}").`, 'Example: --url https://example.com');
+    const pages = args.pages ? String(args.pages).split(',').map((p) => p.trim()).filter(Boolean) : ['/'];
+    const { runDesign } = await import('./design/index.mjs');
+    const res = await withBrowser((browser) => runDesign({ browser, url, pages, root: process.cwd(), docsRoot: args.root ? path.resolve(args.root) : undefined, outDir: args.out ? path.resolve(args.out) : undefined }));
+    const p = res.profile;
+    if (args.json) return console.log(JSON.stringify(p, null, 2));
+    log.ok(`Design profile written to ${path.relative(process.cwd(), res.dir) || '.'}/ (design-profile.json, design-profile.md)`);
+    log.info(`  overall confidence ${p.summary.level} (${Math.round(p.summary.overallConfidence * 100)}%) · ${p.summary.conflicts} conflict(s) · ${p.summary.missing} value(s) not found`);
+    if (p.guards.reelkitDefaults.matches.length) log.warn('Some observed colours coincide with reelkit\'s default palette; see "Heads-up" in design-profile.md.');
   },
 
   async all(args) {

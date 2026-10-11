@@ -3,7 +3,7 @@ import path from 'node:path';
 
 const IGNORE = new Set(['node_modules', '.git', '.next', 'dist', 'build', '.svelte-kit', '.astro', '.output', '.vercel', 'coverage', '.turbo', '.reelkit']);
 
-function walk(dir, out = [], depth = 0) {
+export function walk(dir, out = [], depth = 0) {
   if (depth > 12 || !existsSync(dir)) return out;
   for (const name of readdirSync(dir)) {
     if (IGNORE.has(name)) continue;
