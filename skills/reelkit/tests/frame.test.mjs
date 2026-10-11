@@ -95,7 +95,9 @@ test('built-in frame defaults are unchanged (Phase 0 must not restyle anything)'
     { background: cfg.frame.background, backgroundDark: cfg.frame.backgroundDark, accent: cfg.frame.accent, padding: cfg.frame.padding, radius: cfg.frame.radius, shadow: cfg.frame.shadow },
     { background: 'aurora', backgroundDark: 'midnight', accent: '#7c5cff', padding: 72, radius: 12, shadow: true },
   );
-  const hash = createHash('sha256').update(readFileSync(path.join(TEMPLATES_DIR, 'backgrounds.json'))).digest('hex');
+  // Hash the parsed presets, not the file bytes: Git may check text out with CRLF on Windows.
+  const presets = JSON.parse(readFileSync(path.join(TEMPLATES_DIR, 'backgrounds.json'), 'utf8'));
+  const hash = createHash('sha256').update(JSON.stringify(presets)).digest('hex');
   recorded.backgroundsJson = hash;
   if (!UPDATE) assert.equal(hash, baseline.backgroundsJson, 'templates/backgrounds.json changed: presets are part of the baseline');
 });
