@@ -182,6 +182,26 @@ function collectInPage({ maxElements }) {
     }
   };
   const icons = [...document.querySelectorAll('link[rel~="icon"], link[rel="apple-touch-icon"], link[rel="mask-icon"]')].map((l) => ({ rel: l.rel, href: abs(l.getAttribute('href')), sizes: l.sizes?.value || l.getAttribute('sizes'), type: l.type || null, color: l.getAttribute('color') }));
+  // Colours a logo SVG actually paints. Only shapes carry paint: <svg>, <g> and <defs> report a default
+  // black `fill` that is never drawn, so they are skipped. Gradients are read from their <stop>s
+  // (stop-color), and url(#…) fills are skipped because the stops already stand for them.
+  const svgPaints = (svg) => {
+    const seen = new Map();
+    const add = (css) => {
+      const c = css && css !== 'none' && !css.startsWith('url(') ? toRGBA(css) : null;
+      if (c && c[3] > 0.5) seen.set(c.slice(0, 3).join(','), c);
+    };
+    for (const n of svg.querySelectorAll('path, rect, circle, ellipse, polygon, polyline, line, text, tspan, stop')) {
+      if (n.closest('clipPath, mask, pattern, symbol, marker')) continue;
+      const cs = gs(n);
+      if (n.tagName.toLowerCase() === 'stop') add(cs.stopColor);
+      else {
+        add(cs.fill);
+        add(cs.stroke);
+      }
+    }
+    return [...seen.values()];
+  };
   const logoScope = 'header, nav, [role=banner], [class*=logo i], [id*=logo i], [class*=brand i], a[href="/"]';
   const logos = [];
   for (const el of document.querySelectorAll(`${logoScope.split(',').map((s) => `${s.trim()} img, ${s.trim()} svg`).join(', ')}`)) {
@@ -201,7 +221,7 @@ function collectInPage({ maxElements }) {
       inHeader,
       homeLink,
       named,
-      fills: el.tagName.toLowerCase() === 'svg' ? [...new Set([...el.querySelectorAll('*')].map((n) => gs(n).fill).filter((f) => f && f !== 'none'))].slice(0, 6).map((f) => toRGBA(f)).filter(Boolean) : [],
+      fills: el.tagName.toLowerCase() === 'svg' ? svgPaints(el) : [],
     });
   }
 
