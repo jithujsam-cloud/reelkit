@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { hideCss } from '../browser.mjs';
-import { iconRank, logoScore } from './analyze.mjs';
+import { classifyPage, iconRank, logoScore } from './analyze.mjs';
 
 export const INSPECT_VIEWPORTS = [
   { name: 'desktop', width: 1440, height: 900, mobile: false },
@@ -121,11 +121,16 @@ function collectInPage({ maxElements }) {
   // ── CSS custom properties declared on :root / html / body (light) or dark scopes
   const vars = new Map();
   let unreadableSheets = 0;
+  const unreadableHrefs = [];
+  let darkClassRules = 0;
+  // Rules that only apply when a class/attribute is switched on (html.dark, [data-theme=dark], Tailwind `dark:`).
+  const DARK_CLASS = /(^|[\s,>+~(])(?:html|body|:root)?\.(?:dark|theme-dark|dark-mode|darkmode|dark-theme)(?![\w-])|\[(?:data-(?:theme|mode|color-mode|bs-theme)|class\*?)=["']?dark|\.dark\\:/i;
   const fontFaces = [];
   const scope = (sel) => (/^(:root|html|body)(\s*,|$)/.test(sel.trim()) ? 'root' : /(\.dark|\[data-theme=["']?dark|\[data-mode=["']?dark|prefers-color-scheme)/i.test(sel) ? 'dark' : null);
   const walkRules = (rules, inDarkMedia) => {
     for (const rule of rules) {
       if (rule.type === CSSRule.STYLE_RULE) {
+        if (!inDarkMedia && DARK_CLASS.test(rule.selectorText)) darkClassRules++;
         const sc = inDarkMedia && /^(:root|html|body)/.test(rule.selectorText) ? 'dark' : scope(rule.selectorText);
         if (!sc) continue;
         for (let i = 0; i < rule.style.length; i++) {
@@ -148,6 +153,7 @@ function collectInPage({ maxElements }) {
       walkRules(sheet.cssRules, false);
     } catch {
       unreadableSheets++;
+      if (sheet.href && unreadableHrefs.length < 20) unreadableHrefs.push(sheet.href);
     }
   }
   // Resolve each variable the way the page would use it, so oklch()/hsl-channel/var() chains become sRGB.
@@ -265,6 +271,10 @@ function collectInPage({ maxElements }) {
     fontFaces,
     documentFonts,
     unreadableSheets,
+    unreadableHrefs,
+    darkClassRules,
+    rootDarkMarker: /(^|[\s_-])dark([\s_-]|$)/i.test(`${root.className} ${root.getAttribute('data-theme') ?? ''} ${root.getAttribute('data-mode') ?? ''} ${document.body.className}`),
+    themeToggle: !!document.querySelector('[aria-label*="theme" i], [aria-label*="dark mode" i], [data-theme-toggle], [class*="theme-toggle" i], [class*="dark-toggle" i], [id*="theme-toggle" i], [id*="dark-toggle" i]'),
     icons,
     ogImage: abs(meta('meta[property="og:image"]') ?? meta('meta[name="twitter:image"]')),
     manifest: abs(meta('link[rel=manifest]', 'href')),
@@ -387,9 +397,18 @@ export async function inspectPage(browser, url, { assetsDir, maxElements = 1500,
   obs.failedResources = [];
   try {
     const page = await open(ctx, obs.failedResources);
+    obs.finalUrl = page.url();
+    const verdict = classifyPage(url, obs.finalUrl, obs.status);
+    if (verdict?.kind === 'auth-required') {
+      obs.skipped = verdict; // never profile a login wall as the site's design
+      return obs;
+    }
+    if (verdict) {
+      obs.errors.push(`${url} answered ${verdict.reason}`);
+      return obs;
+    }
     obs.main = await page.evaluate(collectInPage, { maxElements });
     obs.rendered = await renderedFonts(ctx, page);
-    obs.finalUrl = page.url();
     if (assetsDir) {
       const wanted = new Map();
       const best = [...obs.main.logos].sort((a, b) => logoScore(b) - logoScore(a))[0];

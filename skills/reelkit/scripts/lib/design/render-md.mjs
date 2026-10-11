@@ -12,7 +12,7 @@ export function renderMarkdown(p) {
   const out = [];
   const name = p.site.name || p.site.title || p.site.url;
   out.push(`# Design profile: ${name}`, '');
-  out.push(`Source: ${p.site.url} · inspected ${p.generator.generatedAt.slice(0, 10)} with reelkit ${p.generator.version}`);
+  out.push(`Source: ${p.site.url} · reelkit ${p.generator.version}`);
   out.push(`Overall confidence in the core tokens: **${p.summary.level} (${pct(p.summary.overallConfidence)})** · ${p.summary.conflicts} conflict(s) · ${p.summary.missing} value(s) not found`, '');
   for (const w of p.summary.warnings ?? []) out.push(`> **Warning:** ${w}`, '');
   out.push('> Everything here was measured from the rendered site unless a row says otherwise. Values that could not be established are listed under **Not found**, not filled in. Machine-readable twin: `design-profile.json` (evidence ids like `e3` refer to its `evidence` list).', '');
@@ -21,10 +21,20 @@ export function renderMarkdown(p) {
   const crow = (label, tok) => [label, tok.value ? `\`${tok.value.hex}\` (oklch ${tok.value.oklch.l} ${tok.value.oklch.c} ${tok.value.oklch.h})` : '—', tok.value ? badge(tok) : 'not found', [tok.basis, ...(tok.notes ?? []), tok.reason].filter(Boolean).join('; ')];
   out.push(table(['Role', 'Value', 'Confidence', 'Notes'], [crow('Background', c.background), crow('Text', c.text), crow('Muted text', c.textMuted), crow('Primary', c.primary), crow('Accent', c.accent), crow('Surface', c.surface), crow('Border', c.border), crow('Danger', c.danger), crow('Success', c.success), crow('Warning', c.warning)]), '');
   if (c.palette.value?.length) out.push(`Observed palette (by weighted use): ${c.palette.value.map((x) => `\`${x.hex}\` ${pct(x.share)}`).join(' · ')}`, '');
-  if (schemes.prefersDark.value) out.push(schemes.prefersDark.value.responds ? `Dark scheme: the page responds to \`prefers-color-scheme: dark\` (background \`${schemes.prefersDark.value.background}\`, text \`${schemes.prefersDark.value.text}\`).` : 'Dark scheme: the page does not respond to `prefers-color-scheme` (a manual toggle would not be detected).', '');
+  const pd = schemes.prefersDark.value;
+  if (pd) {
+    out.push(
+      pd.responds
+        ? `Dark scheme: the page responds to \`prefers-color-scheme: dark\` (background \`${pd.background}\`, text \`${pd.text}\`).`
+        : pd.status === 'unverified'
+          ? `Dark scheme: **unverified**. ${schemes.prefersDark.notes[0]}`
+          : 'Dark scheme: none found (the page ignores `prefers-color-scheme`, and no class-based dark rules or theme toggle were detected).',
+      '',
+    );
+  }
 
   out.push('## Typography', '');
-  const frow = (label, tok) => [label, tok.value ? `${tok.value.family ?? 'generic stack'}` : '—', tok.value ? tok.value.origin : '', tok.value ? badge(tok) : 'not found', [...(tok.notes ?? []), tok.reason].filter(Boolean).join('; ')];
+  const frow = (label, tok) => [label, tok.value ? `${tok.value.family ?? 'generic stack'}${tok.value.generated ? ` (\`${tok.value.cssFamily}\`)` : ''}` : '—', tok.value ? tok.value.origin : '', tok.value ? badge(tok) : 'not found', [...(tok.notes ?? []), tok.reason].filter(Boolean).join('; ')];
   out.push(table(['Role', 'Family', 'Origin', 'Confidence', 'Notes'], [frow('Headings', t.heading), frow('Body', t.body), frow('Buttons / UI', t.ui), frow('Monospace', t.mono)]), '');
   if (t.base.value) out.push(`Body text: ${t.base.value.size}px, weight ${t.base.value.weight}${t.base.value.lineHeightRatio ? `, line-height ${t.base.value.lineHeightRatio}` : ''} (${badge(t.base)}).`);
   if (t.headings.value) out.push('', table(['Level', 'Size', 'Weight', 'Line height', 'Letter spacing'], Object.entries(t.headings.value).map(([k, h]) => [k, `${h.size}px`, h.weight, h.lineHeight ? `${h.lineHeight}px` : 'normal', h.letterSpacing ? `${h.letterSpacing}px` : '0'])));
@@ -33,6 +43,7 @@ export function renderMarkdown(p) {
   out.push('');
 
   out.push('## Spacing, shape and surfaces', '');
+  for (const d of p.site.designSystems ?? []) out.push(`- Design system signal: **${d.name}**${d.style ? `, style \`${d.style}\`` : ''}${d.baseColor ? `, base colour \`${d.baseColor}\`` : ''}${d.css ? `, stylesheet \`${d.css}\`` : ''} (from the project's components.json).`);
   out.push(s.unit.value ? `- Spacing base unit: **${s.unit.value}px** (${badge(s.unit)}); common values ${s.scale.value.map((x) => `${x.value}`).join(', ')}px.` : `- Spacing base unit: not established (${s.unit.reason}).`);
   const rad = (k, tok) => (tok.value === null ? `${k}: —` : `${k}: ${tok.value === 'pill' ? 'pill' : `${tok.value}px`}`);
   out.push(`- Corner radius: ${[rad('buttons', sh.radiusButton), rad('cards', sh.radiusCard), rad('inputs', sh.radiusInput)].join(' · ')}`);

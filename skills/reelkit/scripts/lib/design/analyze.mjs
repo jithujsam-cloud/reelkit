@@ -1,6 +1,7 @@
 // Turns raw page observations (inspect.mjs) into design facts. Pure functions: no browser, no I/O.
 // Facts say what was *seen* and how strongly; profile.mjs decides how to weigh them against claims.
 import { deltaEOK, oklabToOklch, rgbToOklab, toHex, contrastRatio } from '../color.mjs';
+import { normalizeFontFamily } from './fontnames.mjs';
 
 export const CHROMA_MIN = 0.06; // below this a colour reads as neutral (grey/black/white)
 export const SAME_COLOR = 0.03; // ΔEok under which two colours are one colour for counting
@@ -90,11 +91,13 @@ function colorFacts(els, main) {
   return { pageBg: { rgb: pageBg, defaulted: main.pageBg.defaulted }, text, topText, muted, primary, primaryBasis, accent, chromatic, surfaces, border, palette, textSamples: els.filter(hasBodyText).length };
 }
 
+// Stylesheet hosts that only serve @font-face rules: unreadable cross-origin CSS from them hides no colours.
+const FONT_CSS_HOSTS = /^https?:\/\/(fonts\.googleapis\.com|fonts\.bunny\.net|use\.typekit\.net|p\.typekit\.net|fonts\.adobe\.com|kit\.fontawesome\.com|use\.fontawesome\.com)\//i;
 const GENERIC_FAMILIES = new Set(['sans-serif', 'serif', 'monospace', 'system-ui', 'ui-sans-serif', 'ui-serif', 'ui-monospace', 'cursive', 'fantasy']);
 export function stackFirst(stack) {
   for (const part of String(stack).split(',')) {
     const f = part.trim().replace(/^['"]|['"]$/g, '');
-    if (f && !GENERIC_FAMILIES.has(f.toLowerCase())) return f;
+    if (f && !GENERIC_FAMILIES.has(f.toLowerCase()) && !normalizeFontFamily(f).fallback) return f;
   }
   return null;
 }
@@ -116,12 +119,15 @@ function typographyFacts(els, main, rendered) {
     const first = stackFirst(stack);
     const loaded = main.documentFonts.some((f) => f.family.toLowerCase() === first?.toLowerCase() && f.status === 'loaded');
     const declared = main.fontFaces.some((f) => f.family.toLowerCase() === first?.toLowerCase());
+    const norm = first ? normalizeFontFamily(first) : null;
     families[role] = {
       stack,
       first,
+      display: norm?.family ?? null,
+      generated: !!norm?.generated,
       share: w / total,
       n: list.length,
-      origin: !first ? 'generic-only' : loaded ? 'webfont' : declared ? 'webfont-declared-not-loaded' : 'system-or-unlisted',
+      origin: !first ? 'generic-only' : loaded ? 'webfont' : declared || norm.generated ? 'webfont-declared-not-loaded' : 'system-or-unlisted',
       rendered: rendered?.[role]?.family ?? null,
     };
   }
@@ -216,6 +222,28 @@ function responsiveFacts(res) {
   return { viewports: names.map((n) => ({ name: n, ...res[n] })), notes };
 }
 
+const LOGINISH = /(^|\/)(log[-_]?in|sign[-_]?in|sso|auth(entication)?|oauth2?|session\/new|users\/sign_in)(\/|$|\.)/i;
+
+/**
+ * Decide whether a loaded page is the page that was asked for. Pages behind a login (HTTP 401/403, or a
+ * redirect to a login/SSO URL) are *skipped*, never profiled: their login form would otherwise be
+ * reported as the site's design. Other HTTP errors are errors. Returns null when the page is usable.
+ */
+export function classifyPage(requested, finalUrl, status) {
+  if (status === 401 || status === 403) return { kind: 'auth-required', reason: `HTTP ${status}` };
+  try {
+    const a = new URL(requested);
+    const b = new URL(finalUrl);
+    if ((a.origin !== b.origin || a.pathname !== b.pathname) && LOGINISH.test(b.pathname) && !LOGINISH.test(a.pathname)) {
+      return { kind: 'auth-required', reason: `redirected to ${b.origin === a.origin ? b.pathname : b.origin + b.pathname}` };
+    }
+  } catch {
+    /* unparsable URLs fall through to the status check */
+  }
+  if (status >= 400) return { kind: 'http-error', reason: `HTTP ${status}` };
+  return null;
+}
+
 /** Collapse observations from one or more pages (first = primary) into facts. */
 export function analyze(observations) {
   const ok = observations.filter((o) => o.main);
@@ -229,6 +257,12 @@ export function analyze(observations) {
     const moved = deltaEOK(rgb3(dark.bg), rgb3(light.bg)) > 0.05;
     scheme = { responds: moved, dark: moved ? { background: rgb3(dark.bg), text: rgb3(dark.text) } : null };
   }
+  // Dark themes switched by a class/attribute (html.dark, [data-theme=dark], Tailwind `dark:`) are not
+  // exercised by prefers-color-scheme emulation; record the evidence so the profile can say "unverified".
+  scheme.classRules = main.darkClassRules ?? 0;
+  scheme.rootDarkMarker = !!main.rootDarkMarker;
+  scheme.toggleControl = !!main.themeToggle;
+  scheme.unreadableOpaque = (main.unreadableHrefs ?? []).filter((h) => !FONT_CSS_HOSTS.test(h)).length;
   const pageBgs = ok.map((o) => rgb3(o.main.pageBg.rgba));
   return {
     pages: ok.map((o) => ({ url: o.finalUrl ?? o.url, title: o.main.title, elements: o.main.elements.length, of: o.main.elementsTotal })),
@@ -245,6 +279,7 @@ export function analyze(observations) {
     unreadableSheets: main.unreadableSheets,
     assets: { logos: main.logos, icons: main.icons, ogImage: main.ogImage, manifest: main.manifest, themeColor: main.themeColor, fetched: ok[0].fetched ?? null, inlineLogoSaved: ok[0].inlineLogoSaved ?? null },
     failedResources: ok[0].failedResources ?? [],
+    skipped: observations.filter((o) => o.skipped).map((o) => ({ url: o.url, kind: o.skipped.kind, reason: o.skipped.reason })),
     errors: observations.flatMap((o) => o.errors ?? []),
   };
 }

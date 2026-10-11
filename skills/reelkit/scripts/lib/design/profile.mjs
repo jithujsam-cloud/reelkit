@@ -67,7 +67,7 @@ function token(value, { confidence, sources = [], notes = [], basis }) {
   return { value, confidence, level: levelOf(confidence), sources, ...(basis ? { basis } : {}), ...(notes.length ? { notes } : {}) };
 }
 
-export function buildProfile({ facts, claims = [], repoFiles = [], url, now = new Date(), command = 'design' }) {
+export function buildProfile({ facts, claims = [], repoFiles = [], designSystems = [], url, command = 'design' }) {
   const ev = new Evidence();
   const conflicts = [];
   const missing = [];
@@ -226,35 +226,40 @@ export function buildProfile({ facts, claims = [], repoFiles = [], url, now = ne
     }
     const sources = [rendered(`computed font-family on ${f.n} ${role} element(s): ${f.stack}`)];
     const notes = [];
+    const name = f.display ?? f.first; // human family: next/font aliases like __Inter_5e0a8e become "Inter"
     let nConflicts = 0;
     let corroboratedBy = 0;
     if (!f.first) notes.push('only generic families (sans-serif, system-ui, …) are specified');
+    if (f.generated) notes.push(`next/font alias "${f.first}" normalised to "${name}"`);
     if (f.origin === 'webfont') notes.push('web font, loaded on the page');
-    if (f.origin === 'webfont-declared-not-loaded') notes.push('declared via @font-face but not loaded in this render');
+    if (f.origin === 'webfont-declared-not-loaded') notes.push(f.generated ? 'next/font web font; its file was not loaded in this render' : 'declared via @font-face but not loaded in this render');
     if (f.origin === 'system-or-unlisted') notes.push(facts.unreadableSheets ? 'not found among readable @font-face rules; some stylesheets were cross-origin, so it may still be a web font' : 'no @font-face found: treated as an installed/system font');
-    if (f.rendered && f.first && f.rendered.toLowerCase() !== f.first.toLowerCase()) {
+    if (f.rendered && name && f.rendered.toLowerCase() !== name.toLowerCase()) {
       if (f.origin === 'system-or-unlisted') {
-        notes.push(`${f.first} is not installed on the inspecting machine, so ${f.rendered} was painted instead; the profile records what the site asks for`);
+        notes.push(`${name} is not installed on the inspecting machine, so ${f.rendered} was painted instead; the profile records what the site asks for`);
       } else {
-        notes.push(`the stack starts with ${f.first} but Chromium painted ${f.rendered}: the web font may have failed to load`);
-        conflicts.push({ path: `tokens.typography.${role}`, summary: `web font "${f.first}" was requested but "${f.rendered}" was rendered`, observed: { value: f.rendered, evidence: sources[0] }, claimed: { value: f.first, evidence: sources[0], via: 'computed font-family' }, deltaE: null, resolution: 'observed-kept', severity: 'info' });
+        notes.push(`the stack starts with ${name} but Chromium painted ${f.rendered}: the web font may have failed to load`);
+        conflicts.push({ path: `tokens.typography.${role}`, summary: `web font "${name}" was requested but "${f.rendered}" was rendered`, observed: { value: f.rendered, evidence: sources[0] }, claimed: { value: name, evidence: sources[0], via: 'computed font-family' }, deltaE: null, resolution: 'observed-kept', severity: 'info' });
       }
     }
     const wantRole = role === 'ui' ? 'body' : role;
-    const mine = fontClaims.filter((c) => c.role === wantRole);
+    // role 'any' claims (@fontsource, next/font without a role hint) can only corroborate, never contradict.
+    const mine = fontClaims.filter((c) => c.role === wantRole || c.role === 'any');
+    const seen = [name, f.first, f.rendered].filter(Boolean).map((x) => x.toLowerCase());
     for (const c of mine) {
+      const matches = seen.includes(c.family.toLowerCase());
+      if (c.role === 'any' && !matches) continue;
       const cid = ev.add('repo-file', c.line ? `${c.file}:${c.line}` : c.file, c.text);
-      const seen = [f.first, f.rendered].filter(Boolean).map((x) => x.toLowerCase());
-      if (role === 'ui' && !seen.includes(c.family.toLowerCase())) continue; // ui buttons often differ from body claims; not a conflict
-      if (seen.includes(c.family.toLowerCase())) {
+      if (role === 'ui' && !matches) continue; // ui buttons often differ from body claims; not a conflict
+      if (matches) {
         sources.push(cid);
         corroboratedBy = 1;
       } else {
         nConflicts++;
-        conflicts.push({ path: `tokens.typography.${role}`, summary: `${c.via} names "${c.family}", but the rendered ${role} text asks for "${f.first ?? f.rendered ?? f.stack}"`, observed: { value: f.first ?? f.rendered, evidence: sources[0] }, claimed: { value: c.family, evidence: cid, via: c.via }, deltaE: null, resolution: 'observed-kept' });
+        conflicts.push({ path: `tokens.typography.${role}`, summary: `${c.via} names "${c.family}", but the rendered ${role} text asks for "${name ?? f.rendered ?? f.stack}"`, observed: { value: name ?? f.rendered, evidence: sources[0] }, claimed: { value: c.family, evidence: cid, via: c.via }, deltaE: null, resolution: 'observed-kept' });
       }
     }
-    typography[role] = token({ family: f.first ?? f.rendered, rendered: f.rendered, declaredStack: f.stack, origin: f.origin }, { confidence: scoreConfidence({ share: f.share, n: f.n, corroboratedBy, conflicts: nConflicts, cap: f.first || f.rendered ? 1 : 0.4 }), sources, notes });
+    typography[role] = token({ family: name ?? f.rendered, rendered: f.rendered, declaredStack: f.stack, origin: f.origin, ...(f.generated ? { cssFamily: f.first, generated: true } : {}) }, { confidence: scoreConfidence({ share: f.share, n: f.n, corroboratedBy, conflicts: nConflicts, cap: f.first || f.rendered ? 1 : 0.4 }), sources, notes });
   }
   typography.base = T.base
     ? token(T.base, { confidence: scoreConfidence({ share: 1, n: T.base.n }), sources: [rendered(`most common body-text size/weight over ${T.base.n} elements`)] })
@@ -301,16 +306,37 @@ export function buildProfile({ facts, claims = [], repoFiles = [], url, now = ne
     viewports: R.viewports.length >= 2 ? token(R.viewports, { confidence: round(0.3 + 0.2 * R.viewports.length), sources: [rendered(`inspected at ${R.viewports.map((v) => `${v.name} ${v.viewport[0]}px`).join(', ')}`)] }) : gone('tokens.responsive.viewports', 'fewer than two viewports could be inspected'),
     behaviors: R.viewports.length >= 2 ? token(R.notes, { confidence: 0.6, sources: [rendered('comparison of desktop, tablet and mobile renders')], notes: R.notes.length ? [] : ['no notable differences detected; this does not prove the layout is not responsive'] }) : gone('tokens.responsive.behaviors', 'fewer than two viewports could be inspected'),
   };
-  const schemes = {
-    prefersDark:
-      facts.scheme.responds === null
-        ? gone('tokens.schemes.prefersDark', 'the dark-scheme probe did not run')
-        : token(facts.scheme.responds ? { responds: true, background: toHex(facts.scheme.dark.background), text: toHex(facts.scheme.dark.text) } : { responds: false }, {
-            confidence: 0.7,
-            sources: [rendered('page background re-measured under prefers-color-scheme: dark')],
-            notes: facts.scheme.responds ? [] : ['the page ignores prefers-color-scheme; a manual theme toggle is not detected and may still exist'],
-          }),
-  };
+  let schemeLimitation = null;
+  // Dark scheme. `responds` keeps its original meaning (prefers-color-scheme changes the page). A theme
+  // switched by a class/attribute (html.dark, [data-theme=dark], Tailwind `dark:`) or by a toggle control
+  // cannot be seen through prefers-color-scheme emulation, so "no dark theme" is then *unverified*, not a fact.
+  const sc = facts.scheme;
+  let prefersDark;
+  if (sc.responds === null) prefersDark = gone('tokens.schemes.prefersDark', 'the dark-scheme probe did not run');
+  else if (sc.responds) {
+    prefersDark = token({ responds: true, status: 'verified', background: toHex(sc.dark.background), text: toHex(sc.dark.text) }, { confidence: 0.7, sources: [rendered('page background re-measured under prefers-color-scheme: dark')] });
+  } else {
+    const classToggle = sc.classRules > 0 || sc.toggleControl;
+    const opaque = !classToggle && sc.unreadableOpaque > 0;
+    const unverified = classToggle || opaque;
+    const detail = classToggle
+      ? [sc.classRules > 0 && `${sc.classRules} CSS rule(s) target a dark class/attribute`, sc.toggleControl && 'a theme-toggle control exists'].filter(Boolean).join(' and ')
+      : opaque
+        ? `${sc.unreadableOpaque} cross-origin stylesheet(s) could not be read, so dark rules in them would be invisible`
+        : null;
+    prefersDark = token(
+      { responds: false, status: unverified ? 'unverified' : 'verified', toggle: classToggle ? 'class-or-attribute' : opaque ? 'unknown' : 'none-detected', ...(sc.classRules ? { darkRules: sc.classRules } : {}), ...(sc.toggleControl ? { themeToggleControl: true } : {}) },
+      {
+        confidence: unverified ? 0.35 : 0.7,
+        sources: [rendered(unverified ? `prefers-color-scheme: dark did not change the page; ${detail}` : 'page background re-measured under prefers-color-scheme: dark')],
+        notes: unverified
+          ? [`dark theme unverified: ${detail}. It is switched by something this inspection does not exercise, so dark colours are not recorded and "no dark theme" must not be assumed`]
+          : ['the page ignores prefers-color-scheme and no class-based dark rules or theme toggle were found'],
+      },
+    );
+    if (unverified) schemeLimitation = `Dark theme unverified: ${detail}. Not exercised, so no dark colours are recorded.`;
+  }
+  const schemes = { prefersDark };
 
   // ── assets
   const A = facts.assets;
@@ -378,12 +404,16 @@ export function buildProfile({ facts, claims = [], repoFiles = [], url, now = ne
   ];
   if (facts.unreadableSheets) limitations.push(`${facts.unreadableSheets} cross-origin stylesheet(s) could not be read, so their CSS variables and @font-face rules are not listed.`);
   if (facts.pages.length === 1) limitations.push('A single page was inspected; other pages may use different treatments.');
+  if (schemeLimitation) limitations.push(schemeLimitation);
+  for (const k of facts.skipped) limitations.push(`Skipped ${k.url}: ${k.kind === 'auth-required' ? 'it requires login' : 'not usable'} (${k.reason}). reelkit design profiles public pages only; its login screen is not the site's design.`);
   if (facts.errors.length) limitations.push(...facts.errors.map((e) => `Inspection error: ${e}`));
 
   return {
     schemaVersion: SCHEMA_VERSION,
-    generator: { name: 'reelkit', version: VERSION, command, generatedAt: now.toISOString() },
-    site: { url, pages: facts.pages, title: facts.site.title || null, name: facts.site.name || null, lang: facts.site.lang || null, description: facts.site.description || null, viewports: facts.responsive.viewports.map((v) => ({ name: v.name, width: v.viewport[0], height: v.viewport[1] })) },
+    // No timestamp here: the canonical profile is byte-stable across runs. Run metadata is written
+    // separately (design-profile.run.json, see index.mjs).
+    generator: { name: 'reelkit', version: VERSION, command },
+    site: { url, pages: facts.pages, title: facts.site.title || null, name: facts.site.name || null, lang: facts.site.lang || null, description: facts.site.description || null, viewports: facts.responsive.viewports.map((v) => ({ name: v.name, width: v.viewport[0], height: v.viewport[1] })), ...(designSystems.length ? { designSystems: designSystems.map((d) => ({ name: d.name, ...d.details, evidence: ev.add('repo-file', d.file, `${d.name} configuration`) })) } : {}), ...(facts.skipped.length ? { skipped: facts.skipped } : {}) },
     summary: { overallConfidence: overall, level: levelOf(overall), warnings, coreTokens: ['colors.background', 'colors.text', 'colors.primary', 'typography.heading', 'typography.body'], conflicts: conflicts.length, missing: missing.length, repoFilesRead: repoFiles.length },
     tokens: { colors, typography, spacing, shape, surfaces, layout, responsive, schemes },
     assets,
@@ -433,6 +463,7 @@ export function validateProfile(profile) {
     const walkTo = m.path.split('.').reduce((n, k) => n?.[k], profile);
     if (!walkTo || walkTo.value !== null) problems.push(`missing[] path "${m.path}" does not point to a null token`);
   }
+  for (const d of profile.site.designSystems ?? []) if (!ids.has(d.evidence)) problems.push(`site.designSystems: evidence "${d.evidence}" not found`);
   for (const c of profile.conflicts) {
     if (c.observed && !ids.has(c.observed.evidence)) problems.push(`conflict at ${c.path}: observed evidence "${c.observed.evidence}" not found`);
     if (!ids.has(c.claimed.evidence)) problems.push(`conflict at ${c.path}: claimed evidence "${c.claimed.evidence}" not found`);

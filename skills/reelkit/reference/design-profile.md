@@ -11,6 +11,7 @@ Inspects the live site as an anonymous visitor and writes two files to `.reelkit
 |---|---|
 | `design-profile.md` | Human-readable identity: colour roles, type, spacing, shape, surfaces, layout, responsive behaviour, brand assets, then **Conflicts**, **Not found**, limitations. |
 | `design-profile.json` | The same data as tokens with confidence and evidence. Validated against `schema/design-profile.schema.json` before it is written. |
+| `design-profile.run.json` | Run metadata only: when it ran, reelkit version, pages, and SHA-256 of the two files above. The only output that changes between runs of an unchanged site. |
 | `assets/` | Logo (inline SVG or image), favicon and og:image, when they could be downloaded (≤ 2 MB, images only). |
 
 The command never edits `reelkit.config.yaml`, never reads `frame.*` from it (only `baseUrl`, when
@@ -24,7 +25,12 @@ The command never edits `reelkit.config.yaml`, never reads `frame.*` from it (on
 2. **CSS variables** the site serves (`css-variable`): `:root`/`html`/`body` custom properties, resolved
    the way the page would use them (including shadcn-style bare HSL channels).
 3. **Repo files** (`repo-file`): design docs (`DESIGN.md`, `brand*.md`, …), `tailwind.config.*`,
-   `tokens.json`/`theme.json`, and `.css` files under `--root` (default: the current directory).
+   `tokens.json`/`theme.json`, and `.css` files under `--root` (default: the current directory), plus
+   font declarations: `@fontsource/*` and `@fontsource-variable/*` dependencies in `package.json`, and
+   `next/font/google` imports (a `variable: '--font-heading'` or const name hints the role). Those
+   carry role `any` unless a hint or a "mono" name says otherwise: they can **corroborate** an observed
+   font but never contradict it (a project may install fonts it does not use on the page).
+   `components.json` (shadcn/ui) is recorded as a design-system signal under `site.designSystems`.
    Heuristic and line-based; each claim keeps its file and line.
 4. **Markup** (`markup`): `<link rel=icon>`, `og:image`, `theme-color`.
 
@@ -61,6 +67,41 @@ cap at 0.30.
   (`observedOnSite: true`) and the `.md` adds a heads-up: the value is real, but a project using it
   cannot reveal brand mismatches. A match that was only declared is flagged `observedOnSite: false`.
 * `guards.fallbacksUsed` is always `false` (the schema enforces it).
+
+## Dark themes
+
+`tokens.schemes.prefersDark.value` keeps `responds` (does `prefers-color-scheme: dark` change the page?)
+and adds `status`:
+
+| status | meaning |
+|---|---|
+| `verified` | it responds (dark colours are recorded), or nothing suggests a dark theme exists |
+| `unverified` | it does not respond, but dark rules sit behind a class/attribute (`html.dark`, `[data-theme=dark]`, Tailwind `dark:`), a theme-toggle control exists, or unreadable cross-origin CSS (other than font hosts) could hide them. `toggle` says which; confidence drops to 0.35 and a limitation is added. Dark colours are **not** recorded and "no dark theme" must not be assumed. |
+
+The inspection does not click toggles or add classes; that is deliberate for now.
+
+## Pages that are not the site
+
+* `401`/`403`, or a redirect to a login/SSO URL, marks a page **skipped** (`site.skipped`, plus a
+  limitation). A login form is never reported as the site's design. If every page is skipped the command
+  fails ("Every page needs login").
+* Any other HTTP error (404, 500, …) fails the inspection instead of profiling the error page.
+* An unreachable host fails with a `fix:` line. Nothing is written in any of these cases.
+
+## Generated font names
+
+`next/font` rewrites families to build-time aliases (`__Inter_5e0a8e`, with a metric fallback
+`__Inter_Fallback_5e0a8e`). The profile reports the family (`value.family: "Inter"`), keeps the alias in
+`value.cssFamily` with `generated: true`, ignores the fallback entry when choosing the first family, and
+treats an alias as a web font (it can never be a system font).
+
+## Determinism
+
+`design-profile.json` and `design-profile.md` contain no timestamps, absolute paths or counters: for an
+unchanged site, repeated runs write byte-identical files (asset file names are content hashes). The
+time of each run lives only in `design-profile.run.json`, whose `profileSha256` lets you check that two
+runs produced the same profile. `generator.generatedAt` is therefore optional in the schema (profiles
+written by earlier versions that include it still validate).
 
 ## What it does not see
 

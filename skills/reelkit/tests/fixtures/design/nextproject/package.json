@@ -1,0 +1,1 @@
+{ "name": "nextproject", "dependencies": { "next": "15.0.0", "@fontsource/jetbrains-mono": "^5.0.0", "react": "19.0.0" } }
