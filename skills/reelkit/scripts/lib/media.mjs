@@ -58,5 +58,8 @@ export async function decodes(file) {
 
 export async function extractFrame(file, seconds, out, width) {
   const vf = width ? ['-vf', `scale=${width}:-2:flags=lanczos`] : [];
-  await ffmpeg(['-ss', String(Math.max(0, seconds)), '-i', file, '-frames:v', '1', ...vf, out]);
+  const ss = String(Math.max(0, seconds));
+  // GIFs store frames as transparent deltas: decode from the start (output seek) or frames ghost.
+  const args = file.endsWith('.gif') ? ['-i', file, '-ss', ss] : ['-ss', ss, '-i', file];
+  await ffmpeg([...args, '-frames:v', '1', ...vf, out]);
 }

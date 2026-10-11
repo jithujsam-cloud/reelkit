@@ -1,0 +1,10 @@
+{
+  "aurora": { "dark": true, "css": "radial-gradient(1200px 700px at 12% 8%, rgba(255,255,255,.22), transparent 60%), radial-gradient(900px 600px at 95% 100%, rgba(34,211,238,.55), transparent 60%), linear-gradient(135deg, #6d4cff 0%, #8b5cf6 40%, #22b8e0 100%)" },
+  "sunset": { "dark": true, "css": "radial-gradient(900px 600px at 85% 10%, rgba(255,255,255,.25), transparent 60%), linear-gradient(135deg, #ff6a88 0%, #ff8e53 55%, #ffc46b 100%)" },
+  "ocean": { "dark": true, "css": "radial-gradient(1000px 700px at 10% 0%, rgba(255,255,255,.2), transparent 60%), linear-gradient(135deg, #0f62fe 0%, #1fa2ff 50%, #12d8c4 100%)" },
+  "mesh": { "dark": true, "css": "radial-gradient(800px 600px at 15% 20%, #ff5fa2 0%, transparent 55%), radial-gradient(900px 700px at 85% 25%, #7c5cff 0%, transparent 55%), radial-gradient(900px 700px at 50% 100%, #22d3ee 0%, transparent 55%), #1b1240" },
+  "midnight": { "dark": true, "css": "radial-gradient(900px 600px at 15% 0%, rgba(124,92,255,.45), transparent 60%), radial-gradient(800px 600px at 100% 100%, rgba(34,211,238,.28), transparent 60%), linear-gradient(180deg, #0b0d17 0%, #10121f 100%)" },
+  "slate": { "dark": true, "css": "linear-gradient(160deg, #1e293b 0%, #0f172a 100%)" },
+  "paper": { "dark": false, "css": "radial-gradient(900px 600px at 10% 0%, rgba(124,92,255,.10), transparent 60%), linear-gradient(180deg, #fafafa 0%, #f1f1f4 100%)" },
+  "transparent": { "dark": false, "css": "transparent" }
+}

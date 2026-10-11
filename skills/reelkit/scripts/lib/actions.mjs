@@ -134,13 +134,15 @@ export class Director {
     if (arg.clear !== false) await loc.fill('');
     await sleep(200);
     const [lo, hi] = this.cfg.motion.typingDelay;
-    this.record('type', { x, y, chars: text.length });
+    const typeStart = Date.now() / 1000;
     for (const ch of text) {
       await this.page.keyboard.type(ch);
       // Longer pauses after spaces/punctuation read as natural typing.
       const pause = lo + this.random() * (hi - lo) + (/[\s,.]/.test(ch) ? 60 : 0);
       await sleep(pause);
     }
+    // Keystroke round-trips can be slower than real typing; the assembler re-times this window.
+    this.events.push({ type: 'type', t: typeStart, end: Date.now() / 1000, x, y, chars: text.length });
     await sleep(250);
   }
 

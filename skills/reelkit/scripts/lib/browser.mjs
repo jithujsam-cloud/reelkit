@@ -48,12 +48,14 @@ export async function launchBrowser({ headless = true } = {}) {
   }
 }
 
-export function hideCss({ hide = [], mask = [], builtins = true }) {
+export function hideCss({ hide = [], mask = [], builtins = true, motion = false, keepBackdropBlur = false }) {
   const hidden = [...(builtins ? BUILTIN_HIDE : []), ...hide];
   return [
     hidden.length ? `${hidden.join(',\n')} { display: none !important; }` : '',
     mask.length ? `${mask.join(',\n')} { filter: blur(7px) saturate(0.6) !important; }` : '',
     '* { caret-color: transparent !important; }',
+    // Headless Chromium renders backdrop blur in software: at 2x it drops recordings to ~3 fps.
+    motion && !keepBackdropBlur ? '* { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }' : '',
     'html { scrollbar-width: none !important; } ::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }',
   ].join('\n');
 }
@@ -139,7 +141,7 @@ export async function openPage(browser, cfg, shot, { motion = false } = {}) {
   if (cfg.determinism.time) {
     await context.clock.install({ time: new Date(cfg.determinism.time) });
   }
-  const css = hideCss({ hide: shot.scene.hide, mask: shot.scene.mask, builtins: cfg.determinism.hideBuiltins });
+  const css = hideCss({ hide: shot.scene.hide, mask: shot.scene.mask, builtins: cfg.determinism.hideBuiltins, motion, keepBackdropBlur: cfg.motion.keepBackdropBlur });
   await context.addInitScript(installStyleScript, { css, id: `${NAME}-hide` });
   const page = await context.newPage();
   page.setDefaultTimeout(shot.scene.stability.timeout);

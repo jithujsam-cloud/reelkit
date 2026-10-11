@@ -33,7 +33,7 @@ const DEFAULTS = {
   },
   auth: { mode: 'none', loggedOutSelector: 'input[type=password]', storageState: `${WORK_DIR}/auth.json` },
   motion: { fps: 30, cursor: true, zoom: false, maxHold: 0.7, startHold: 0.8, endHold: 1.6, loop: true, typingDelay: [45, 120], cursorSpeed: 1 },
-  gif: { width: 960, fps: 15, quality: 85, maxBytes: 5_000_000 },
+  gif: { width: 960, fps: 15, quality: 90, maxBytes: 5_000_000, encoder: 'auto' },
   frame: { background: 'aurora', backgroundDark: 'midnight', accent: '#7c5cff', padding: 72, radius: 12, shadow: true },
   marketing: {},
   readme: { file: 'README.md' },

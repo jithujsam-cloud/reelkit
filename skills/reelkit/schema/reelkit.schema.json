@@ -178,7 +178,8 @@
         "endHold": { "type": "number", "minimum": 0, "default": 1.6 },
         "loop": { "type": "boolean", "default": true, "description": "Crossfade the end into the first frame for a seamless loop." },
         "typingDelay": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2, "default": [45, 120] },
-        "cursorSpeed": { "type": "number", "minimum": 0.2, "maximum": 4, "default": 1 }
+        "cursorSpeed": { "type": "number", "minimum": 0.2, "maximum": 4, "default": 1 },
+        "keepBackdropBlur": { "type": "boolean", "default": false, "description": "Keep CSS backdrop-filter during recordings (costly in headless Chromium; off by default)." }
       }
     },
     "gif": {
@@ -187,7 +188,8 @@
       "properties": {
         "width": { "type": "integer", "minimum": 320, "maximum": 1600, "default": 960 },
         "fps": { "type": "integer", "minimum": 6, "maximum": 30, "default": 15 },
-        "quality": { "type": "integer", "minimum": 30, "maximum": 100, "default": 85 },
+        "quality": { "type": "integer", "minimum": 30, "maximum": 100, "default": 90 },
+        "encoder": { "type": "string", "enum": ["auto", "gifski", "ffmpeg"], "default": "auto", "description": "auto = gifski (sharpest) unless the clip zooms, where ffmpeg's palette encoder avoids ghost trails." },
         "maxBytes": { "type": "integer", "minimum": 100000, "default": 5000000 }
       }
     },
@@ -201,8 +203,7 @@
         "padding": { "type": "integer", "minimum": 0, "default": 72 },
         "radius": { "type": "integer", "minimum": 0, "default": 12 },
         "shadow": { "type": "boolean", "default": true },
-        "title": { "type": "string" },
-        "caption": { "type": "string" }
+        "url": { "type": "string", "description": "Text in the browser frame's address bar ('none' hides it; default: the page's host and path)." }
       }
     },
     "marketing": {
