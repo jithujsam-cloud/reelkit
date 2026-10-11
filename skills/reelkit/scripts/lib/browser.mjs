@@ -25,8 +25,12 @@ function candidateExecutables() {
 }
 
 /** Launch Chromium; if Playwright's pinned build is missing, fall back to any installed one. */
+export function extraArgs() {
+  return (process.env[`${ENV_PREFIX}_CHROMIUM_ARGS`] ?? '').split(/\s+/).filter(Boolean);
+}
+
 export async function launchBrowser({ headless = true } = {}) {
-  const args = ['--hide-scrollbars', '--font-render-hinting=none', '--disable-lcd-text', '--force-color-profile=srgb'];
+  const args = ['--hide-scrollbars', '--font-render-hinting=none', '--disable-lcd-text', '--force-color-profile=srgb', ...extraArgs()];
   try {
     return await chromium.launch({ headless, args });
   } catch (err) {

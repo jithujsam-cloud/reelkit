@@ -5,7 +5,7 @@ import { ENV_PREFIX, NAME } from './brand.mjs';
 import { AuthExpiredError, ReelkitError, c, log, registerSecret } from './log.mjs';
 import { expandEnv, expandEnvDeep } from './env.mjs';
 import { absoluteUrl, resolveBaseUrl } from './config.mjs';
-import { launchBrowser } from './browser.mjs';
+import { extraArgs, launchBrowser } from './browser.mjs';
 import { ensureDir, ensureGitignore } from './fsutil.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -100,7 +100,7 @@ async function manualLogin(cfg) {
       `Use auth.mode: form (with ${ENV_PREFIX}_EMAIL/${ENV_PREFIX}_PASSWORD) or token, or run \`${NAME} auth\` on your own machine.`,
     );
   }
-  const browser = await chromium.launch({ headless: false }).catch(() => launchBrowser({ headless: false }));
+  const browser = await chromium.launch({ headless: false, args: extraArgs() }).catch(() => launchBrowser({ headless: false }));
   const context = await browser.newContext({ viewport: null, extraHTTPHeaders: headers(cfg) });
   const page = await context.newPage();
   const start = absoluteUrl(cfg, cfg.auth.loginUrl ?? '/');
