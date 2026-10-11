@@ -37,6 +37,7 @@ function sampleTimes(result) {
   const times = new Map([
     [0.05, 'first'],
     [d / 2, 'middle'],
+    [Math.max(0, d - 1.0), 'end-state'],
     [Math.max(0, d - 0.15), 'last'],
   ]);
   for (const [i, e] of (result.events ?? []).entries()) {
@@ -110,7 +111,7 @@ async function contactSheet(cfg, entries) {
     img{max-width:100%;max-height:200px;object-fit:contain}
     figcaption{display:flex;justify-content:space-between;gap:8px;padding:10px 12px;font-size:12px}
     figcaption b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .pass span{color:#4ade80}.failed span{color:#f87171}.pending_review span{color:#eab308}
+    figcaption span{white-space:nowrap}.pass span{color:#4ade80}.failed span{color:#f87171}.pending_review span{color:#eab308}
   </style><h1>${NAME} contact sheet</h1><p>${entries.length} assets · ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC</p><main>${tiles}</main>`;
   const htmlFile = path.join(cfg.workDir, 'contact-sheet.html');
   writeFileSync(htmlFile, html);

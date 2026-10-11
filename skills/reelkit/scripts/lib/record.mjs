@@ -63,7 +63,11 @@ export function zoomFilter(events, { width, height, fps, duration }) {
   for (const [i, e] of zooms.entries()) {
     const next = zooms[i + 1]?.t ?? duration;
     const inStart = Math.max(0, e.t - 0.55);
-    const outStart = Math.min(Math.max(e.t + 1.1, inStart + 0.8), next - 0.7, duration - 0.9);
+    // The last zoomed click eases out right away so its result is visible during the end hold.
+    // Stay zoomed while the user types into what was just clicked.
+    const typing = events.find((t) => t.type === 'type' && t.t >= e.t && t.t - e.t < 0.8);
+    const hold = typing?.end ? typing.end - e.t + 0.5 : i === zooms.length - 1 ? 0.35 : 1.1;
+    const outStart = Math.min(Math.max(e.t + hold, e.t + 0.3), next - 0.7, duration - 0.9);
     const outEnd = Math.min(outStart + 0.6, duration);
     if (outStart <= e.t) continue;
     windows.push({ ...e, inStart, outStart, outEnd });

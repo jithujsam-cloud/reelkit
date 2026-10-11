@@ -1,0 +1,14 @@
+{
+  "name": "reelkit",
+  "description": "reelkit: verified screenshots, framed mockups and demo GIFs for your README, made by Claude.",
+  "owner": { "name": "Jithu Jobin Sam", "url": "https://github.com/jithujsam-cloud" },
+  "plugins": [
+    {
+      "name": "reelkit",
+      "source": "./",
+      "description": "Turn any deployed web app into a README-ready media kit: verified screenshots, device-framed mockups and smooth demo GIF/MP4s, including pages behind login.",
+      "category": "productivity",
+      "tags": ["screenshots", "readme", "gif", "demo", "mockup"]
+    }
+  ]
+}

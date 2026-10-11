@@ -50,8 +50,11 @@ scenes:
       - click: "text=New campaign"
       - type: { into: "#campaign-name", text: "Q4 Outbound" }
       - select: { from: "#channel", value: "LinkedIn" }
-      - click: "text=Create campaign"
+      - click: { selector: "text=Create campaign", zoom: false }   # the result appears elsewhere: stay wide
       - wait: { text: "Q4 Outbound" }
+
+gif:
+  width: 880                     # matches the README display width
 
 frame:
   background: aurora

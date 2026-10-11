@@ -1,0 +1,15 @@
+{
+  "name": "reelkit-repo",
+  "private": true,
+  "description": "Development helpers for the reelkit skill and its demo app. The skill itself lives in skills/reelkit.",
+  "scripts": {
+    "reelkit": "node skills/reelkit/scripts/reelkit.mjs",
+    "test": "npm --prefix skills/reelkit test",
+    "demo:install": "npm --prefix examples/demo-app ci",
+    "demo:build": "npm --prefix examples/demo-app run build",
+    "demo:start": "npm --prefix examples/demo-app run start",
+    "demo:wait": "node .github/scripts/wait-for-url.mjs http://localhost:3000/login 60",
+    "media": "node skills/reelkit/scripts/reelkit.mjs all"
+  },
+  "engines": { "node": ">=18.17" }
+}

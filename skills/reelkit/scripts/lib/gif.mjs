@@ -33,7 +33,7 @@ async function encodeFfmpeg(input, out, s) {
   const colors = s.quality >= 80 ? 256 : s.quality >= 60 ? 192 : 128;
   await ffmpeg([
     '-i', input,
-    '-filter_complex', `fps=${s.fps},scale=${s.width}:-2:flags=lanczos,split[a][b];[a]palettegen=max_colors=${colors}:stats_mode=diff[p];[b][p]paletteuse=dither=sierra2_4a:diff_mode=rectangle`,
+    '-filter_complex', `fps=${s.fps},scale=${s.width}:-2:flags=lanczos,split[a][b];[a]palettegen=max_colors=${colors}:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle`,
     '-loop', '0', out,
   ]);
 }
