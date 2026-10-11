@@ -4,9 +4,16 @@ import { deltaEOK, oklabToOklch, rgbToOklab, toHex, contrastRatio } from '../col
 
 export const CHROMA_MIN = 0.06; // below this a colour reads as neutral (grey/black/white)
 export const SAME_COLOR = 0.03; // ΔEok under which two colours are one colour for counting
+// Neutrals differ by very little on purpose (#ffffff vs #f9fafb is 0.0155): two neutrals are the same
+// colour only below this much tighter distance, so a card on a tinted page stays a distinct surface.
+export const SAME_NEUTRAL = 0.01;
 
 export const oklch = (rgb) => oklabToOklch(rgbToOklab(rgb));
 export const isChromatic = (rgb) => oklch(rgb)[1] >= CHROMA_MIN;
+/** Perceptual identity used for counting and surface detection: tight for neutrals, SAME_COLOR otherwise. */
+export const sameColor = (a, b) => deltaEOK(a, b) < (!isChromatic(a) && !isChromatic(b) ? SAME_NEUTRAL : SAME_COLOR);
+// Text can live in any element that is not a heading/button/link/input/code (e.g. a card or a block).
+const hasBodyText = (e) => e.textLen > 0 && ['text', 'card', 'block', 'nav'].includes(e.role);
 const rgb3 = (c) => [c[0], c[1], c[2]];
 const round = (v, d = 2) => Math.round(v * 10 ** d) / 10 ** d;
 const mode = (arr) => {
@@ -21,10 +28,11 @@ const median = (a) => {
 };
 
 /** Greedy perceptual clustering. items: [{rgb:[r,g,b], w}] → clusters sorted by total weight. */
-export function clusterColors(items, threshold = SAME_COLOR) {
+export function clusterColors(items, threshold) {
   const clusters = [];
+  const same = threshold === undefined ? sameColor : (a, b) => deltaEOK(a, b) < threshold;
   for (const it of [...items].sort((a, b) => b.w - a.w)) {
-    const hit = clusters.find((c) => deltaEOK(c.rgb, it.rgb) < threshold);
+    const hit = clusters.find((c) => same(c.rgb, it.rgb));
     if (hit) {
       hit.w += it.w;
       hit.n += it.n ?? 1;
@@ -38,8 +46,8 @@ const opaque = (c) => c && c[3] >= 0.5;
 
 function colorFacts(els, main) {
   const pageBg = rgb3(main.pageBg.rgba);
-  const far = (rgb) => deltaEOK(rgb, pageBg) > SAME_COLOR;
-  const text = clusterColors(els.filter((e) => e.role === 'text' && e.color && opaque(e.color)).map((e) => ({ rgb: rgb3(e.color), w: e.textLen })));
+  const far = (rgb) => !sameColor(rgb, pageBg);
+  const text = clusterColors(els.filter((e) => hasBodyText(e) && e.color && opaque(e.color)).map((e) => ({ rgb: rgb3(e.color), w: e.textLen })));
   const topText = text[0] ?? null;
   const muted = topText
     ? text.slice(1).find((c) => c.n >= 3 && !isChromatic(c.rgb) && contrastRatio(c.rgb, pageBg) >= 2 && contrastRatio(c.rgb, pageBg) < contrastRatio(topText.rgb, pageBg))
@@ -79,7 +87,7 @@ function colorFacts(els, main) {
     { rgb: pageBg, w: 5, n: 1 },
     ...els.flatMap((e) => [e.bg && opaque(e.bg) && { rgb: rgb3(e.bg), w: Math.sqrt(e.rect[2] * e.rect[3]) / 20 }, e.color && e.textLen > 0 && opaque(e.color) && { rgb: rgb3(e.color), w: e.textLen / 20 }].filter(Boolean)),
   ]).slice(0, 8);
-  return { pageBg: { rgb: pageBg, defaulted: main.pageBg.defaulted }, text, topText, muted, primary, primaryBasis, accent, chromatic, surfaces, border, palette, textSamples: els.filter((e) => e.role === 'text').length };
+  return { pageBg: { rgb: pageBg, defaulted: main.pageBg.defaulted }, text, topText, muted, primary, primaryBasis, accent, chromatic, surfaces, border, palette, textSamples: els.filter(hasBodyText).length };
 }
 
 const GENERIC_FAMILIES = new Set(['sans-serif', 'serif', 'monospace', 'system-ui', 'ui-sans-serif', 'ui-serif', 'ui-monospace', 'cursive', 'fantasy']);
@@ -94,7 +102,7 @@ export function stackFirst(stack) {
 function typographyFacts(els, main, rendered) {
   const byRole = {
     heading: els.filter((e) => e.role === 'heading'),
-    body: els.filter((e) => e.role === 'text'),
+    body: els.filter(hasBodyText),
     ui: els.filter((e) => e.role === 'button'),
     mono: els.filter((e) => e.role === 'code'),
   };
@@ -224,7 +232,7 @@ export function analyze(observations) {
   const pageBgs = ok.map((o) => rgb3(o.main.pageBg.rgba));
   return {
     pages: ok.map((o) => ({ url: o.finalUrl ?? o.url, title: o.main.title, elements: o.main.elements.length, of: o.main.elementsTotal })),
-    pageBgAgreement: pageBgs.every((c) => deltaEOK(c, pageBgs[0]) < SAME_COLOR),
+    pageBgAgreement: pageBgs.every((c) => sameColor(c, pageBgs[0])),
     site: { title: main.title, name: main.siteName, lang: main.lang, description: main.description },
     colors: colorFacts(els, main),
     typography: typographyFacts(els, main, ok[0].rendered),

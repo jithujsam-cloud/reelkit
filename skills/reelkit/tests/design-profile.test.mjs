@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { parseHex, deltaEOK } from '../scripts/lib/color.mjs';
 import { parseCssColor, findColorLiterals } from '../scripts/lib/design/css-color.mjs';
 import { roleFromName, extractFromCss, extractFromMarkdown, extractFromTailwind, extractFromTokensJson } from '../scripts/lib/design/claims.mjs';
+import { clusterColors } from '../scripts/lib/design/analyze.mjs';
 import { REELKIT_DEFAULT_PALETTE, levelOf, scoreConfidence, validateProfile } from '../scripts/lib/design/profile.mjs';
 import { profileFromObservations } from '../scripts/lib/design/index.mjs';
 import { renderMarkdown } from '../scripts/lib/design/render-md.mjs';
@@ -195,6 +196,49 @@ test('the browser’s default link blue is flagged, not trusted as a brand colou
   assert.equal(p.tokens.colors.primary.value.hex, '#0000ee');
   assert.ok(p.tokens.colors.primary.confidence <= 0.3);
   assert.match(p.tokens.colors.primary.notes.join(' '), /default link colour/);
+});
+
+
+/* ───────────── accuracy fixes: neutrals, card text ───────────── */
+
+test('neutral tolerance: #ffffff and #f9fafb stay distinct, imperceptible neutral differences and near-identical hues still merge', () => {
+  const k = (...hexes) => clusterColors(hexes.map((h) => ({ rgb: parseHex(h), w: 1 }))).length;
+  assert.equal(k('#ffffff', '#f9fafb'), 2, 'white vs gray-50 (ΔEok 0.0155) are different surfaces');
+  assert.equal(k('#ffffff', '#fafafa'), 2);
+  assert.equal(k('#f9fafb', '#f3f4f6'), 2);
+  assert.equal(k('#ffffff', '#fefefe'), 1, 'ΔEok 0.003 is the same neutral');
+  assert.equal(k('#2563eb', '#2564ec'), 1, 'near-identical hues still merge');
+  assert.equal(k('#2563eb', '#1d4ed8'), 2, 'chromatic colours keep the existing 0.03 rule (ΔEok 0.058 is distinct, as before)');
+});
+
+test('a white card on a #f9fafb page is detected as a distinct surface', () => {
+  const card = (hex) => el('card', { bg: rgba(hex), parentBg: rgba('#f9fafb'), borderColor: rgba('#e5e7eb'), borderWidth: 1, radius: 12, rect: [0, 0, 400, 120] });
+  const p = build([...bodyText(), ...buttons('#2563eb', 3), card('#ffffff'), card('#ffffff'), card('#ffffff')], { main: { pageBg: { rgba: rgba('#f9fafb'), defaulted: false } } });
+  assert.equal(p.tokens.colors.background.value.hex, '#f9fafb');
+  assert.equal(p.tokens.colors.surface.value.hex, '#ffffff');
+  assert.deepEqual(validateProfile(p), []);
+});
+
+test('a surface that really matches the page background (ΔEok 0.003) is still not reported as distinct', () => {
+  const card = el('card', { bg: rgba('#fefefe'), parentBg: rgba('#ffffff'), borderColor: rgba('#e5e7eb'), borderWidth: 1, rect: [0, 0, 400, 120] });
+  const p = build([...bodyText(), card, card, card]);
+  assert.equal(p.tokens.colors.surface.value, null);
+});
+
+test('text that lives inside cards contributes to the body font, size and text colour', () => {
+  const cardFont = { ...FONT, family: '"Source Serif 4", serif', size: 17 };
+  const cards = Array.from({ length: 4 }, () => el('card', { textLen: 30, color: rgba('#222222'), font: cardFont, bg: rgba('#ffffff'), parentBg: rgba('#f9fafb'), rect: [0, 0, 400, 120] }));
+  const p = build(cards, { main: { pageBg: { rgba: rgba('#f9fafb'), defaulted: false } } });
+  assert.equal(p.tokens.typography.body.value?.family, 'Source Serif 4');
+  assert.equal(p.tokens.typography.base.value?.size, 17);
+  assert.equal(p.tokens.colors.text.value?.hex, '#222222');
+  assert.deepEqual(validateProfile(p), []);
+});
+
+test('buttons, links and headings are not double-counted as body text', () => {
+  const p = build([...buttons('#0b6bcb', 6, { font: { ...FONT, family: 'Mono Face, monospace' } }), el('heading', { level: 1, textLen: 20, font: { ...FONT, family: 'Head Face, serif', size: 40 } })]);
+  assert.equal(p.tokens.typography.body.value, null, 'no body text anywhere');
+  assert.equal(p.tokens.typography.ui.value.family, 'Mono Face');
 });
 
 /* ───────────── missing values ───────────── */
@@ -445,6 +489,28 @@ test('fixture sites inspected in Chromium', async (t) => {
     assert.ok(p.tokens.colors.primary.confidence <= 0.3, `primary ${p.tokens.colors.primary.confidence}`);
     assert.ok(p.tokens.typography.body.confidence <= 0.4);
     assert.ok(p.summary.overallConfidence <= 0.45, `overall ${p.summary.overallConfidence}`);
+  });
+
+  await t.test('lightcard: white cards on #f9fafb give a surface, and card text gives the body font (regression)', async () => {
+    const { profile: p } = await inspectFixture('lightcard', browser);
+    assert.deepEqual(validateProfile(p), []);
+    assert.equal(p.tokens.colors.background.value.hex, '#f9fafb');
+    assert.equal(p.tokens.colors.surface.value?.hex, '#ffffff');
+    assert.equal(p.tokens.surfaces.style.value?.kind, 'bordered');
+    assert.equal(p.tokens.typography.body.value?.family, 'Helvetica', 'all body text is inside .card elements');
+    assert.equal(p.tokens.colors.primary.value.hex, '#2563eb');
+  });
+
+  await t.test('svglogo: gradient stops are captured and <g>/<defs> add no bogus black (regression)', async () => {
+    const { profile: p } = await inspectFixture('svglogo', browser);
+    assert.deepEqual(validateProfile(p), []);
+    assert.equal(p.assets.logo.value.kind, 'inline-svg');
+    assert.deepEqual(p.assets.logo.value.fills, ['#e11d48', '#f59e0b', '#ffffff']);
+  });
+
+  await t.test('svglogo-black: a logo that really is black keeps its black', async () => {
+    const { profile: p } = await inspectFixture('svglogo-black', browser);
+    assert.deepEqual(p.assets.logo.value.fills, ['#000000', '#ffffff']);
   });
 
   await t.test('inspection is deterministic: two runs give identical profiles', async () => {

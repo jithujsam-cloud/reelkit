@@ -28,6 +28,10 @@ All notable changes to this project are documented here. The format follows
 - `discover.mjs` now exports `walk` (no behaviour change).
 
 ### Fixed
+- Design profile accuracy (follow-up to Phase 1): neutrals are compared with a tighter tolerance
+  (ΔEok 0.01 instead of 0.03), so a white card on a `#f9fafb` page is a distinct surface; logo SVG colour
+  extraction reads only painted shapes and gradient `stop-color`s (no more phantom black from `<g>`/`<defs>`);
+  text inside cards now counts towards body font, size and text colour.
 - `loadConfig()` no longer throws when called twice in one process (schema compiled once).
 
 ## [0.1.0] - 2026-10-11

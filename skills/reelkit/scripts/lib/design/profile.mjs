@@ -321,7 +321,7 @@ export function buildProfile({ facts, claims = [], repoFiles = [], url, now = ne
     const fetched = A.fetched?.logo;
     const saved = bestLogo.svg ? A.inlineLogoSaved : fetched && !fetched.error ? fetched : null;
     assets.logo = token(
-      { kind: bestLogo.kind, src: bestLogo.src, alt: bestLogo.alt, width: bestLogo.width, height: bestLogo.height, savedAs: saved?.savedAs ?? null, sha256: saved?.sha256 ?? null, fills: (bestLogo.fills ?? []).map((f) => toHex(rgb3(f))) },
+      { kind: bestLogo.kind, src: bestLogo.src, alt: bestLogo.alt, width: bestLogo.width, height: bestLogo.height, savedAs: saved?.savedAs ?? null, sha256: saved?.sha256 ?? null, fills: [...new Set((bestLogo.fills ?? []).map((f) => toHex(rgb3(f))))].sort() },
       { confidence: sc >= 6 ? 0.85 : sc >= 5 ? 0.75 : sc >= 3 ? 0.55 : 0.35, sources: [rendered(`logo candidate: ${bestLogo.kind}${bestLogo.homeLink ? ' linking home' : ''}${bestLogo.inHeader ? ' in the header' : ''}${bestLogo.named ? ', named logo/brand' : ''}`)], notes: fetched?.error ? [`download failed: ${fetched.error}`] : [] },
     );
   } else assets.logo = gone('assets.logo', A.logos.length ? 'image/SVG candidates near the top of the page did not look like a logo (not in the header, not linked home, not named logo/brand)' : 'no <img> or inline <svg> found in the header or in a logo/brand container');
