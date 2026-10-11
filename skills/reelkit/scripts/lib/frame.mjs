@@ -87,11 +87,11 @@ export function spec(cfg, shot, src, { barFrom } = {}) {
 }
 
 /** Render the template once and screenshot the canvas. Returns canvas + screen rects in CSS px. */
-export async function render(browser, opts, { dsf, out, mode = 'full', screenOnly = false }) {
+export async function render(browser, opts, { dsf, out, mode = 'full', screenOnly = false, entry = 'render' }) {
   const page = await browser.newPage({ viewport: { width: 4200, height: 3200 }, deviceScaleFactor: dsf });
   try {
     await page.goto(TEMPLATE);
-    const rects = await page.evaluate((o) => window.render(o), { ...opts, mode });
+    const rects = await page.evaluate(({ fn, o }) => window[fn](o), { fn: entry, o: { ...opts, mode } });
     const clip = screenOnly ? rects.screen : { x: 0, y: 0, w: rects.canvas.w, h: rects.canvas.h };
     await page.screenshot({
       path: out,
@@ -129,7 +129,7 @@ function record(cfg, out, meta, status = 'PASS', reason) {
   return st === 'PASS';
 }
 
-function sourceOk(cfg, file) {
+export function sourceOk(cfg, file) {
   const r = loadResults(cfg).assets[file];
   return r?.status === 'PASS' && existsSync(path.join(cfg.outDir, file));
 }
@@ -225,7 +225,7 @@ async function frameVideos(cfg, scenes, browser) {
   return failed;
 }
 
-function findShot(cfg, scenes, name, viewportName, theme) {
+export function findShot(cfg, scenes, name, viewportName, theme) {
   const scene = scenes.find((s) => s.name === name);
   if (!scene) return null;
   const shot = shotsFor(scene).find((s) => (!viewportName || s.viewport.name === viewportName || (viewportName === 'desktop' && s.viewport.name === 'wide')) && (!theme || s.theme === theme));

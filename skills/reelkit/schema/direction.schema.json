@@ -1,0 +1,161 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/jithujsam-cloud/reelkit/schema/direction.schema.json",
+  "title": "reelkit design directions",
+  "description": "Candidate directions, approval state, and the approved direction for marketing media. Version 1. Canonical files (candidates, approved direction) contain no timestamps.",
+  "definitions": {
+    "hex": { "type": "string", "pattern": "^#[0-9a-f]{6}$" },
+    "sha": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "pal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canvas", "canvas2", "text", "muted", "accent", "surface", "border"],
+      "properties": {
+        "canvas": { "$ref": "#/definitions/hex" },
+        "canvas2": { "$ref": "#/definitions/hex" },
+        "text": { "$ref": "#/definitions/hex" },
+        "muted": { "$ref": "#/definitions/hex" },
+        "accent": { "$ref": "#/definitions/hex" },
+        "surface": { "$ref": "#/definitions/hex" },
+        "border": { "$ref": "#/definitions/hex" }
+      }
+    },
+    "basis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["used", "choices", "fallbacks", "warnings"],
+      "properties": {
+        "used": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["path", "value", "confidence"], "properties": { "path": { "type": "string" }, "value": {}, "confidence": { "type": "number", "minimum": 0, "maximum": 1 } } } },
+        "choices": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["path", "why"], "properties": { "path": { "type": "string" }, "why": { "type": "string", "minLength": 5 } } } },
+        "fallbacks": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["path", "reason", "used"], "properties": { "path": { "type": "string" }, "reason": { "type": "string", "minLength": 5 }, "used": { "type": "string" } } } },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "direction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "archetype", "rationale", "basis", "palette", "typography", "composition", "devices", "depth", "motion"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+        "name": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "archetype": { "enum": ["brand-led", "minimal", "editorial", "dark-stage"] },
+        "rationale": { "type": "string", "minLength": 20 },
+        "basis": { "$ref": "#/definitions/basis" },
+        "palette": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["light", "dark", "background", "accentUse"],
+          "properties": {
+            "light": { "$ref": "#/definitions/pal" },
+            "dark": { "$ref": "#/definitions/pal" },
+            "background": { "type": "object", "additionalProperties": false, "required": ["kind"], "properties": { "kind": { "enum": ["solid", "split", "tint"] } } },
+            "accentUse": { "enum": ["field", "rule", "tag", "highlight"] }
+          }
+        },
+        "typography": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["voice", "weight", "tracking", "case", "brandFont"],
+          "properties": {
+            "voice": { "enum": ["sans", "serif", "mono"] },
+            "weight": { "type": "integer", "minimum": 400, "maximum": 900 },
+            "tracking": { "type": "number", "minimum": -0.08, "maximum": 0.12 },
+            "case": { "enum": ["none", "uppercase"] },
+            "brandFont": {
+              "oneOf": [
+                { "type": "null" },
+                { "type": "object", "additionalProperties": false, "required": ["family", "confidence", "embed"], "properties": { "family": { "type": "string" }, "confidence": { "type": "number", "minimum": 0, "maximum": 1 }, "embed": { "type": "boolean", "description": "false: only the generic class is used (serif/sans/mono). true is an explicit opt-in to embedding the font." } } }
+              ]
+            }
+          }
+        },
+        "composition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["single", "social", "trio"],
+          "properties": {
+            "single": { "type": "object", "additionalProperties": false, "required": ["family", "deviceScale", "heading"], "properties": { "family": { "enum": ["stage", "split", "poster", "bleed"] }, "deviceScale": { "type": "number", "minimum": 0.3, "maximum": 1.2 }, "heading": { "type": "boolean" }, "bleed": { "type": "number", "minimum": 0, "maximum": 0.4 }, "rulePx": { "type": "integer", "minimum": 1, "maximum": 12 } } },
+            "social": { "type": "object", "additionalProperties": false, "required": ["family", "deviceScale"], "properties": { "family": { "enum": ["copy-left", "stage-top", "field-split"] }, "deviceScale": { "type": "number", "minimum": 0.3, "maximum": 1.2 }, "rulePx": { "type": "integer", "minimum": 1, "maximum": 12 } } },
+            "trio": { "type": "object", "additionalProperties": false, "required": ["family"], "properties": { "family": { "enum": ["cascade", "row", "stack"] } } }
+          }
+        },
+        "devices": { "type": "object", "additionalProperties": false, "required": ["chrome"], "properties": { "chrome": { "enum": ["auto", "light", "dark"] } } },
+        "depth": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["shadow", "ring", "radius"],
+          "properties": {
+            "shadow": { "enum": ["none", "soft", "layered", "hard"] },
+            "ring": { "oneOf": [{ "type": "null" }, { "type": "object", "additionalProperties": false, "required": ["px", "color"], "properties": { "px": { "type": "integer", "minimum": 1, "maximum": 6 }, "color": { "$ref": "#/definitions/hex" } } }] },
+            "radius": { "type": "integer", "minimum": 0, "maximum": 40 }
+          }
+        },
+        "motion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cursor", "ripple", "zoom", "pacing"],
+          "properties": {
+            "cursor": { "enum": ["arrow", "dot", "ring"] },
+            "ripple": { "type": "object", "additionalProperties": false, "required": ["style", "color"], "properties": { "style": { "enum": ["ring", "pulse"] }, "color": { "enum": ["brand", "ink"] } } },
+            "zoom": { "enum": ["none", "subtle", "standard"] },
+            "pacing": { "enum": ["calm", "standard", "brisk"] }
+          }
+        }
+      }
+    },
+    "candidates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "generator", "profile", "directions", "distinctness"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "kind": { "const": "reelkit-directions" },
+        "generator": { "type": "object", "additionalProperties": false, "required": ["name", "version"], "properties": { "name": { "const": "reelkit" }, "version": { "type": "string" } } },
+        "profile": { "type": "object", "additionalProperties": false, "required": ["sha256", "overallConfidence", "level", "quality"], "properties": { "sha256": { "$ref": "#/definitions/sha" }, "overallConfidence": { "type": "number" }, "level": { "enum": ["high", "medium", "low", "none"] }, "quality": { "enum": ["ok", "low"] } } },
+        "directions": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "$ref": "#/definitions/direction" } },
+        "distinctness": { "type": "object", "required": ["ok", "minDifferingAxes", "axes"], "properties": { "ok": { "type": "boolean" }, "minDifferingAxes": { "type": "integer" }, "axes": { "type": "array", "items": { "type": "string" } } } }
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "status", "profileSha256", "selected", "adjustments", "revision", "approved", "history"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "kind": { "const": "reelkit-direction-state" },
+        "status": { "enum": ["proposed", "selected", "approved"] },
+        "profileSha256": { "$ref": "#/definitions/sha" },
+        "selected": { "oneOf": [{ "type": "null" }, { "type": "string" }] },
+        "adjustments": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["path", "value"], "properties": { "path": { "type": "string" }, "value": {} } } } },
+        "revision": { "type": "integer", "minimum": 0 },
+        "approved": { "oneOf": [{ "type": "null" }, { "type": "object", "additionalProperties": false, "required": ["id", "revision", "directionSha256"], "properties": { "id": { "type": "string" }, "revision": { "type": "integer" }, "directionSha256": { "$ref": "#/definitions/sha" } } }] },
+        "history": { "type": "array", "items": { "type": "object", "required": ["event", "at"], "properties": { "event": { "type": "string" }, "at": { "type": "string" }, "id": { "type": "string" }, "note": { "type": "string" } } } }
+      }
+    },
+    "approved": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "approvedFrom", "direction", "directionSha256"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "kind": { "const": "reelkit-direction" },
+        "approvedFrom": { "type": "object", "additionalProperties": false, "required": ["id", "archetype", "profileSha256", "revision", "adjustments"], "properties": { "id": { "type": "string" }, "archetype": { "type": "string" }, "profileSha256": { "$ref": "#/definitions/sha" }, "revision": { "type": "integer", "minimum": 0 }, "adjustments": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["path", "value"], "properties": { "path": { "type": "string" }, "value": {} } } } } },
+        "direction": { "$ref": "#/definitions/direction" },
+        "directionSha256": { "$ref": "#/definitions/sha" }
+      }
+    },
+    "previews": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "source", "profileSha256", "items", "skipped"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "kind": { "const": "reelkit-direction-previews" },
+        "source": { "type": "object", "additionalProperties": false, "required": ["scene", "theme", "file", "sha256", "viewport"], "properties": { "scene": { "type": "string" }, "theme": { "enum": ["light", "dark"] }, "file": { "type": "string" }, "sha256": { "$ref": "#/definitions/sha" }, "viewport": { "type": "string" } } },
+        "profileSha256": { "$ref": "#/definitions/sha" },
+        "items": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["id", "kind", "file", "width", "height", "directionSha256", "productPixels"], "properties": { "id": { "type": "string" }, "kind": { "enum": ["single", "social", "trio"] }, "file": { "type": "string" }, "width": { "type": "integer" }, "height": { "type": "integer" }, "directionSha256": { "$ref": "#/definitions/sha" }, "productPixels": { "const": "unmodified" } } } },
+        "skipped": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["kind", "reason"], "properties": { "kind": { "type": "string" }, "reason": { "type": "string" } } } }
+      }
+    }
+  }
+}
