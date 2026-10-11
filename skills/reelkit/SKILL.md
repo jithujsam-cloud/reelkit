@@ -124,6 +124,17 @@ Finish with `reelkit verify --strict`, which fails unless every asset has a visu
 `reelkit all` runs preflight → session check → shoot → record → frame → verify (→ readme if markers exist).
 Use it for re-runs and CI; it does not replace your visual review.
 
+## Optional: learn the site's design system
+
+```
+reelkit design --url <site> [--pages /pricing,/about] [--root <folder with design docs>]
+```
+Writes `.reelkit/design/design-profile.json` (tokens, confidence, evidence, conflicts, missing values)
+and `design-profile.md`. It only observes and reports: it changes no config, framing or media. Read the
+`.md`, and when you quote it to the user, carry its uncertainty with it (confidence levels, the
+**Conflicts** and **Not found** sections, any **Warning**). Never fill a "not found" value from
+reelkit's own defaults. See [reference/design-profile.md](reference/design-profile.md).
+
 ## When things go wrong
 
 See [reference/troubleshooting.md](reference/troubleshooting.md). Common cases: a scene keeps failing the
