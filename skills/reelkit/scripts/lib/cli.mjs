@@ -20,6 +20,8 @@ Commands
                          --mark <file>=pass|fail [--note "..."]  record a visual verdict
                          --strict  also require a visual PASS for every asset
   readme               Print the README block (--write inserts it between markers)
+  direction <cmd>      Propose, preview, select, adjust and approve a marketing design direction
+                         profile | propose | preview | show | select <id> | adjust --set path=value | approve [--yes] | status
   design               Inspect a site's real design system → .reelkit/design/design-profile.{json,md}
                          --url <url> (default: baseUrl of the config)  --pages /a,/b  --root <dir with design docs>
   all                  preflight → auth check → shoot → record → frame → verify (→ readme if markers exist)
@@ -33,7 +35,7 @@ Options
 `;
 
 function parseArgs(argv) {
-  const args = { _: [], mark: [], only: [] };
+  const args = { _: [], mark: [], only: [], set: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '-h' || a === '--help') args.help = true;
@@ -42,12 +44,12 @@ function parseArgs(argv) {
     else if (a.startsWith('--')) {
       const [k, inline] = a.slice(2).split('=', 2);
       const key = k.replace(/-([a-z])/g, (_, ch) => ch.toUpperCase());
-      const flags = ['ci', 'json', 'force', 'check', 'strict', 'write', 'headed', 'sample', 'configOnly', 'noReadme'];
+      const flags = ['ci', 'json', 'force', 'check', 'strict', 'write', 'headed', 'sample', 'configOnly', 'noReadme', 'yes', 'acceptLowConfidence'];
       if (flags.includes(key)) args[key] = inline === undefined ? true : inline !== 'false';
       else {
         const v = inline ?? argv[++i];
         if (v === undefined) throw new ReelkitError(`--${k} needs a value.`, `See \`${NAME} --help\`.`);
-        if (key === 'mark' || key === 'only') args[key].push(v);
+        if (key === 'mark' || key === 'only' || key === 'set') args[key].push(v);
         else args[key] = v;
       }
     } else args._.push(a);
@@ -165,6 +167,11 @@ const commands = {
     log.ok(`Design profile written to ${path.relative(process.cwd(), res.dir) || '.'}/ (design-profile.json, design-profile.md)`);
     log.info(`  overall confidence ${p.summary.level} (${Math.round(p.summary.overallConfidence * 100)}%) · ${p.summary.conflicts} conflict(s) · ${p.summary.missing} value(s) not found`);
     if (p.guards.reelkitDefaults.matches.length) log.warn('Some observed colours coincide with reelkit\'s default palette; see "Heads-up" in design-profile.md.');
+  },
+
+  async direction(args) {
+    const { runDirection } = await import('./direction/commands.mjs');
+    await runDirection(args._[1], args, { withBrowser });
   },
 
   async all(args) {

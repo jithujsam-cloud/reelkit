@@ -184,6 +184,125 @@
     const clips = [clipOf(vpEl), clipOf(vpEl.parentElement)];
     return { canvas: { w: cv.width, h: cv.height }, screen: { x: sc.x - cv.x, y: sc.y - cv.y, w: sc.width, h: sc.height, clips } };
   };
+
+  // ── Design directions (opt-in; the legacy window.render above is untouched) ──────────────────────
+  // A direction supplies palette, type, depth and a composition *family* per output kind. Everything is
+  // outer composition: the captured screenshot is only ever placed by <img> inside .viewport, scaled
+  // uniformly, never filtered, recoloured or redrawn.
+  window.renderDirection = async (o) => {
+    document.body.className = 'mode-full dir';
+    const { w: W, h: H } = o.size;
+    const P = o.pal;
+    const T = o.type;
+    const root = document.documentElement.style;
+    root.setProperty('--accent', P.accent);
+    root.setProperty('--radius', `${o.depth.radius}px`);
+    root.setProperty('--text', P.text);
+    root.setProperty('--sub', P.muted);
+    const c = document.getElementById('canvas');
+    c.className = 'fixed';
+    c.style.cssText = `width:${W}px;height:${H}px;background:${o.canvasCss};position:relative;overflow:hidden;color:${P.text};font-family:${T.stack}`;
+    const fx = (v, base) => Math.round(base * v);
+    const headStyle = (size) => `font-family:${T.stack};font-weight:${T.weight};letter-spacing:${T.tracking}em;text-transform:${T.case};font-size:${size}px;line-height:1.04;margin:0;color:${P.text}`;
+    const sub = (size) => `font-size:${size}px;line-height:1.35;margin:14px 0 0;color:${P.muted};font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif`;
+    const brandTag = (size) => (o.brand && o.brand !== o.title ? `<div style="display:inline-flex;align-items:center;gap:10px;font:700 ${size}px system-ui,sans-serif;color:${P.text};opacity:.92;margin-bottom:${Math.round(size * 1.1)}px"><i style="width:${size * 0.7}px;height:${size * 0.7}px;border-radius:${o.depth.radius > 8 ? 4 : 1}px;background:${P.accent};display:block"></i>${esc(o.brand)}</div>` : '');
+    const rule = (wpx) => `<div style="width:${wpx}px;height:${o.comp.rulePx ?? 4}px;background:${P.accent};margin:${Math.round(wpx * 0.2)}px 0"></div>`;
+    const deviceStyle = `filter:${(o.depth.dropShadows ?? []).map((x) => `drop-shadow(${x})`).join(' ') || 'none'};${o.depth.ring ? `box-shadow:0 0 0 ${o.depth.ring.px}px ${o.depth.ring.color};` : ''}`;
+    const dev = (d) => `<div class="dslot" style="position:absolute;left:0;top:0;transform-origin:0 0;${deviceStyle}">${device({ ...d, chrome: o.chrome ?? d.chrome }, { shadow: false })}</div>`;
+    const put = (el, { wpx, cx, cy, left, top }) => {
+      const r = el.getBoundingClientRect();
+      const s = wpx / r.width;
+      const w = r.width * s;
+      const h = r.height * s;
+      const x = left !== undefined ? left : cx - w / 2;
+      const y = top !== undefined ? top : cy - h / 2;
+      el.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+      return { x, y, w, h };
+    };
+    const comp = o.comp;
+    let html = '';
+    const devs = o.devices;
+
+    if (o.kind === 'single') {
+      const f = comp.family;
+      if (f === 'stage') {
+        html = `${comp.heading ? `<div id="hd" style="position:absolute;left:0;right:0;top:${fx(0.07, H)}px;text-align:center"><h1 style="${headStyle(fx(0.05, W))}">${esc(o.title)}</h1>${o.caption ? `<p style="${sub(fx(0.0125, W))}">${esc(o.caption)}</p>` : ''}</div>` : ''}${dev(devs[0])}`;
+        c.innerHTML = html;
+        const hd = document.getElementById('hd');
+        const top = hd ? hd.getBoundingClientRect().bottom - c.getBoundingClientRect().top + fx(0.03, H) : 0;
+        const el = c.querySelector('.dslot');
+        const r0 = el.getBoundingClientRect();
+        const wpx = comp.deviceScale * W;
+        const h = r0.height * (wpx / r0.width);
+        put(el, { wpx, cx: W / 2, top: top + (H - top - h) / 2 });
+      } else if (f === 'split') {
+        html = `<div style="position:absolute;left:${fx(0.06, W)}px;top:0;bottom:0;width:${fx(0.34, W)}px;display:flex;flex-direction:column;justify-content:center">${brandTag(fx(0.011, W))}<h1 style="${headStyle(fx(0.042, W))}">${esc(o.title)}</h1>${o.caption ? `<p style="${sub(fx(0.0125, W))}">${esc(o.caption)}</p>` : ''}${rule(fx(0.05, W))}</div>${dev(devs[0])}`;
+        c.innerHTML = html;
+        const el = c.querySelector('.dslot');
+        const wpx = comp.deviceScale * W;
+        const r0 = el.getBoundingClientRect();
+        const h = r0.height * (wpx / r0.width);
+        put(el, { wpx, left: W - wpx * (1 - (comp.bleed ?? 0.1)), top: (H - h) / 2 });
+      } else if (f === 'poster') {
+        const wpx = comp.deviceScale * W;
+        html = `<div style="position:absolute;left:${fx(0.06, W)}px;top:${fx(0.08, H)}px;width:${fx(0.62, W)}px"><h1 style="${headStyle(fx(0.068, W))}">${esc(o.title)}</h1>${rule(fx(0.12, W))}${o.caption ? `<p style="${sub(fx(0.0125, W))};max-width:${fx(0.3, W)}px">${esc(o.caption)}</p>` : ''}</div>
+          <div id="offset" style="position:absolute;border:${comp.rulePx ?? 2}px solid ${P.accent};border-radius:${o.depth.radius}px"></div>${dev(devs[0])}`;
+        c.innerHTML = html;
+        const el = c.querySelector('.dslot');
+        const r0 = el.getBoundingClientRect();
+        const h = r0.height * (wpx / r0.width);
+        const pos = put(el, { wpx, left: W * 0.4, top: H * 0.46 });
+        const off = document.getElementById('offset');
+        off.style.cssText += `;left:${pos.x - 18}px;top:${pos.y - 18}px;width:${pos.w}px;height:${h}px`;
+      } else {
+        // bleed: the product fills the frame; no headline, a small brand tag only
+        html = `<div style="position:absolute;left:${fx(0.04, W)}px;top:${fx(0.045, H)}px">${brandTag(fx(0.011, W))}</div>${dev(devs[0])}`;
+        c.innerHTML = html;
+        const el = c.querySelector('.dslot');
+        put(el, { wpx: comp.deviceScale * W, cx: W / 2, top: H * 0.13 });
+      }
+    } else if (o.kind === 'social') {
+      const f = comp.family;
+      const copy = (left, width, size) => `<div style="position:absolute;left:${left}px;top:0;bottom:0;width:${width}px;display:flex;flex-direction:column;justify-content:center;z-index:2">${brandTag(18)}<h1 style="${headStyle(size)}">${esc(o.title)}</h1>${o.caption ? `<p style="${sub(22)}">${esc(o.caption)}</p>` : ''}</div>`;
+      if (f === 'copy-left') {
+        c.innerHTML = copy(72, 470, 58) + dev(devs[0]);
+        put(c.querySelector('.dslot'), { wpx: comp.deviceScale * W, left: 600, top: 70 });
+      } else if (f === 'stage-top') {
+        c.innerHTML = `<div style="position:absolute;left:56px;top:44px;z-index:2;max-width:700px">${brandTag(16)}<h1 style="${headStyle(40)}">${esc(o.title)}</h1>${o.caption ? `<p style="${sub(19)}">${esc(o.caption)}</p>` : ''}</div>${dev(devs[0])}`;
+        put(c.querySelector('.dslot'), { wpx: comp.deviceScale * W, cx: W * 0.58, top: H * 0.40 });
+      } else {
+        c.innerHTML = `<div style="position:absolute;inset:0 0 0 ${Math.round(W * 0.58)}px;background:${P.canvas2}"></div>${copy(64, 480, 54)}${dev(devs[0])}`;
+        put(c.querySelector('.dslot'), { wpx: comp.deviceScale * W, cx: W * 0.7, top: H * 0.2 });
+      }
+    } else {
+      c.innerHTML = `${o.title ? `<div style="position:absolute;left:0;right:0;top:${Math.round(H * 0.06)}px;text-align:center"><h1 style="${headStyle(Math.round(H * 0.045))}">${esc(o.title)}</h1></div>` : ''}${devs.map(dev).join('')}`;
+      const els = [...c.querySelectorAll('.dslot')];
+      const spec = {
+        cascade: [{ w: 0.6, cx: 0.53, lift: 0.05 }, { w: 0.27, cx: 0.2, lift: 0 }, { w: 0.13, cx: 0.85, lift: -0.01 }],
+        row: [{ w: 0.5, cx: 0.29, lift: 0 }, { w: 0.24, cx: 0.66, lift: 0 }, { w: 0.115, cx: 0.86, lift: 0 }],
+        stack: [{ w: 0.62, cx: 0.36, lift: 0.18 }, { w: 0.3, cx: 0.77, lift: 0.0 }, { w: 0.14, cx: 0.92, lift: 0.04 }],
+      }[comp.family];
+      const boxes = els.map((el, i) => {
+        const r = el.getBoundingClientRect();
+        const s = (W * spec[i].w) / r.width;
+        return { el, w: r.width * s, h: r.height * s, cx: W * spec[i].cx, lift: H * spec[i].lift };
+      });
+      const top = o.title ? H * 0.16 : 0;
+      // Fit the whole group into the space below the headline (scaling it down together if needed),
+      // then centre it there. Devices never collide with the title or run off the canvas.
+      const avail = H * 0.965 - top;
+      const groupH0 = Math.max(...boxes.map((b) => b.h + b.lift));
+      const f = Math.min(1, avail / groupH0);
+      boxes.forEach((b) => { b.w *= f; b.h *= f; b.lift *= f; });
+      const bottom = top + (avail + groupH0 * f) / 2;
+      boxes.forEach((b, i) => put(b.el, { wpx: b.w, left: b.cx - b.w / 2, top: bottom - b.lift - b.h }));
+    }
+    await Promise.all([...document.images].map((i) => (i.complete ? null : new Promise((res) => { i.onload = i.onerror = res; }))));
+    await document.fonts.ready;
+    const sc = document.querySelector('.viewport').getBoundingClientRect();
+    const cv = c.getBoundingClientRect();
+    return { canvas: { w: cv.width, h: cv.height }, screen: { x: sc.x - cv.x, y: sc.y - cv.y, w: sc.width, h: sc.height } };
+  };
 </script>
 </body>
 </html>

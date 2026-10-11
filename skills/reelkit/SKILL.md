@@ -135,6 +135,13 @@ and `design-profile.md`. It only observes and reports: it changes no config, fra
 **Conflicts** and **Not found** sections, any **Warning**). Never fill a "not found" value from
 reelkit's own defaults. See [reference/design-profile.md](reference/design-profile.md).
 
+## Optional: choose a design direction
+
+After `reelkit design` and `reelkit shoot`: `reelkit direction propose` → `preview` → show the user
+`.reelkit/design/directions/compare.html` and let **them** `select` and `approve` (never approve for
+them; approval needs their confirmation). It records `reelkit.direction.json` and changes no output yet.
+See [reference/direction.md](reference/direction.md).
+
 ## When things go wrong
 
 See [reference/troubleshooting.md](reference/troubleshooting.md). Common cases: a scene keeps failing the

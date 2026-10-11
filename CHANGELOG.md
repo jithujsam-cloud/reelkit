@@ -27,6 +27,17 @@ All notable changes to this project are documented here. The format follows
 - Tests: `tests/design-profile.test.mjs` (schema, missing values, confidence, conflicts, guard, fixture sites).
 - `discover.mjs` now exports `walk` (no behaviour change).
 
+### Added (design intelligence, Phase 2: directions, previews, approval)
+- `reelkit direction <profile|propose|preview|show|select|adjust|approve|status>`: three genuinely
+  different, profile-grounded marketing directions (composition families, not just colours), comparable
+  previews rendered from one real capture, and an explicit approval step. Saved as `reelkit.direction.json`.
+- Versioned schema `schema/direction.schema.json`; canonical files carry no timestamps and are byte-stable.
+- Missing or low-confidence profile values are reported as explicit fallbacks; brand colours that were
+  only declared are not used; Reelkit's own palette is never a default.
+- `frame.html` gains an opt-in `renderDirection` entry point (legacy `render()` untouched); `frame.mjs`
+  exports `findShot`/`sourceOk` and `render()` accepts an `entry` option (default unchanged).
+- Approving does not change `shoot`/`record`/`frame`/`verify` output yet (Phase 3).
+
 ### Changed (design profile stabilisation)
 - Dark themes switched by a class/attribute or theme toggle are reported `unverified` (confidence 0.35)
   instead of "no dark theme"; `responds` keeps its meaning and `status`/`toggle` are added.
